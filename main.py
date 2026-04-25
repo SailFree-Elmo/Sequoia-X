@@ -1,8 +1,8 @@
 """Sequoia-X V2 主程序入口。
 
 两种运行模式：
-  python main.py               # 日常模式：1 次 API 调用补今天 + 跑策略 + 推送（秒级）
-  python main.py --backfill    # 回填模式：16 线程并行拉历史 K 线（首次/补数据用，分钟级）
+  python main.py               # 日常模式：8进程增量补数据 + 跑策略 + 飞书推送（2~3分钟）
+  python main.py --backfill    # 回填模式：baostock 拉全市场历史K线（首次/补数据用，约12分钟）
 """
 
 import argparse
@@ -33,7 +33,7 @@ def main() -> None:
     parser.add_argument(
         "--backfill",
         action="store_true",
-        help="回填模式：单线程保守拉取全市场历史 K 线（自动多轮重跑）",
+        help="回填模式：通过 baostock 拉取全市场历史 K 线（约12分钟）",
     )
     args = parser.parse_args()
 
