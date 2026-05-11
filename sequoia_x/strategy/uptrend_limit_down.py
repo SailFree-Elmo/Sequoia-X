@@ -1,4 +1,4 @@
-"""上升趋势跌停策略：趋势中放量跌停，捕捉错杀机会。"""
+"""上升趋势大单日大跌策略：趋势中放量急跌，捕捉错杀（场内 ETF）。"""
 
 import pandas as pd
 
@@ -8,12 +8,12 @@ from sequoia_x.strategy.base import BaseStrategy
 logger = get_logger(__name__)
 
 
-class UptrendLimitDownStrategy(BaseStrategy):
-    """上升趋势跌停策略。
+class EtfUptrendSharpDropStrategy(BaseStrategy):
+    """上升趋势中的单日大跌策略（ETF 版）。
 
     选股条件（向量化，严禁 iterrows）：
     1. 处于上升趋势：昨日20日均线 > 昨日60日均线
-    2. 放量跌停：今日 close <= 昨日 close * 0.905
+    2. 放量急跌：今日跌幅 >= Settings.sharp_drop_pct（相对昨日收盘）
                 且今日 volume > 20日均量的 2.0 倍
 
     Attributes:
@@ -21,17 +21,12 @@ class UptrendLimitDownStrategy(BaseStrategy):
     """
 
     webhook_key: str = "limit_down"
-    _MIN_BARS: int = 60  # 至少需要 60 根 K 线（60日均线）
+    _MIN_BARS: int = 60
 
     def run(self) -> list[str]:
-        """
-        遍历全市场，返回满足上升趋势跌停条件的股票代码列表。
-
-        Returns:
-            满足条件的股票代码列表。
-        """
         symbols = self.engine.get_local_symbols()
         selected: list[str] = []
+        drop_pct = self.settings.sharp_drop_pct
 
         for symbol in symbols:
             try:
@@ -39,29 +34,26 @@ class UptrendLimitDownStrategy(BaseStrategy):
                 if len(df) < self._MIN_BARS:
                     continue
 
-                # 向量化计算均线
                 df["ma20"] = df["close"].rolling(20).mean()
                 df["ma60"] = df["close"].rolling(60).mean()
                 df["vol_ma20"] = df["volume"].rolling(20).mean()
 
-                prev = df.iloc[-2]  # 昨日
-                today = df.iloc[-1]  # 今日
+                prev = df.iloc[-2]
+                today = df.iloc[-1]
 
                 if pd.isna(prev["ma20"]) or pd.isna(prev["ma60"]) or pd.isna(today["vol_ma20"]):
                     continue
 
-                # 条件 1：上升趋势（昨日均线多头排列）
                 uptrend = prev["ma20"] > prev["ma60"]
-                # 条件 2：放量跌停
-                limit_down = today["close"] <= prev["close"] * 0.905
+                sharp_drop = today["close"] <= prev["close"] * (1 - drop_pct)
                 volume_surge = today["volume"] > today["vol_ma20"] * 2.0
 
-                if uptrend and limit_down and volume_surge:
+                if uptrend and sharp_drop and volume_surge:
                     selected.append(symbol)
 
             except Exception as exc:
-                logger.warning(f"[{symbol}] UptrendLimitDownStrategy 计算失败：{exc}")
+                logger.warning(f"[{symbol}] EtfUptrendSharpDropStrategy 计算失败：{exc}")
                 continue
 
-        logger.info(f"UptrendLimitDownStrategy 选出 {len(selected)} 只股票")
+        logger.info(f"EtfUptrendSharpDropStrategy 选出 {len(selected)} 只 ETF")
         return selected

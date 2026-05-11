@@ -4,10 +4,39 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    db_path: str = "data/sequoia_v2.db"
+    db_path: str = "data/etf_sequoia.db"
     start_date: str = "2024-01-01"
     feishu_webhook_url: str  # 必填字段，缺失时抛出 ValidationError
     strategy_webhooks: dict[str, str] = {}
+
+    # ETF 策略阈值（可通过环境变量覆盖，字段名大写下划线）
+    turtle_min_turnover: float = 30_000_000.0  # 海龟策略：最小成交额（元）
+    strong_day_pct: float = 0.03  # 强势日涨幅下限（小数，如 0.03 表示 3%）
+    sharp_drop_pct: float = 0.03  # 上升趋势中单日大跌幅度（小数）
+    high_tight_momentum_ratio: float = 1.3  # 高窄旗形：40 日区间强弱比下限
+    ma_volume_surge_multiplier: float = 1.5  # 均线放量：相对 20 日均量倍数
+    rps_period: int = 120  # RPS 回看交易日数
+    rps_threshold: int = 90  # RPS 百分位下限
+    etf_dual_ma_min_turnover: float = 5_000_000.0  # 双均线趋势：最小成交额（元）
+    etf_dual_ma_confirm_days: int = 3  # 连续若干日 MA20>MA60
+
+    # EtfMultiFactorStrategy：多因子横截面
+    etf_mf_min_turnover_20d: float = 10_000_000.0  # 近20日日均成交额下限（元）
+    etf_mf_max_5d_return_pct: float = 0.12  # 近5日涨幅上限
+    etf_mf_max_drawdown_from_60d_high: float = 0.18  # 相对60日高点最大回撤
+    etf_mf_max_results: int = 40  # 策略输出列表长度上限
+    etf_mf_weight_liquidity: float = 0.35
+    etf_mf_weight_mom20: float = 0.35
+    etf_mf_weight_mom60: float = 0.30
+
+    # EtfTrendFollowStrategy：趋势跟随
+    etf_tf_min_turnover_20d: float = 8_000_000.0
+    etf_tf_max_5d_return_pct: float = 0.15
+    etf_tf_max_results: int = 40
+
+    # 飞书合并日报（STRATEGY_WEBHOOK_DIGEST 可覆盖 digest webhook）
+    feishu_digest_top_n: int = 10
+    feishu_digest_max_per_strategy_display: int = 30
 
     model_config = SettingsConfigDict(
         env_file=".env",

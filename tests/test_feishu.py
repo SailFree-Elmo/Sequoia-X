@@ -33,9 +33,14 @@ def test_notification_contains_all_symbols(symbols: list[str]) -> None:
     settings = make_settings()
     notifier = FeishuNotifier(settings)
 
-    with patch("requests.post") as mock_post:
-        mock_post.return_value = MagicMock(status_code=200)
-        notifier.send(symbols=symbols, strategy_name="TestStrategy")
+    names = {s: f"n{s}" for s in symbols}
+    with patch.object(FeishuNotifier, "_get_stock_names", return_value=names):
+        with patch("requests.post") as mock_post:
+            mock_resp = MagicMock(status_code=200)
+            mock_resp.json.return_value = {"code": 0}
+            mock_resp.text = "{}"
+            mock_post.return_value = mock_resp
+            notifier.send(symbols=symbols, strategy_name="TestStrategy")
 
     call_args = mock_post.call_args
     body = json.loads(call_args.kwargs.get("data") or call_args.args[1] if len(call_args.args) > 1 else call_args.kwargs["data"])
@@ -54,9 +59,13 @@ def test_notification_uses_config_url(webhook_url: str) -> None:
     settings = make_settings(webhook_url=webhook_url)
     notifier = FeishuNotifier(settings)
 
-    with patch("requests.post") as mock_post:
-        mock_post.return_value = MagicMock(status_code=200)
-        notifier.send(symbols=["000001"], strategy_name="Test", webhook_key="default")
+    with patch.object(FeishuNotifier, "_get_stock_names", return_value={"000001": "测试"}):
+        with patch("requests.post") as mock_post:
+            mock_resp = MagicMock(status_code=200)
+            mock_resp.json.return_value = {"code": 0}
+            mock_resp.text = "{}"
+            mock_post.return_value = mock_resp
+            notifier.send(symbols=["000001"], strategy_name="Test", webhook_key="default")
 
     called_url = mock_post.call_args.args[0] if mock_post.call_args.args else mock_post.call_args.kwargs.get("url")
     assert called_url == webhook_url
@@ -84,10 +93,68 @@ def test_http_failure_logs_error(status_code: int) -> None:
     handler = _ListHandler(_logging.ERROR)
     feishu_logger.addHandler(handler)
     try:
-        with patch("requests.post") as mock_post:
-            mock_post.return_value = MagicMock(status_code=status_code, text="error")
-            notifier.send(symbols=["000001"], strategy_name="Test")
+        with patch.object(FeishuNotifier, "_get_stock_names", return_value={"000001": "测试"}):
+            with patch("requests.post") as mock_post:
+                mock_resp = MagicMock(status_code=status_code, text="error")
+                mock_resp.json.return_value = {"code": -1}
+                mock_post.return_value = mock_resp
+                notifier.send(symbols=["000001"], strategy_name="Test")
     finally:
         feishu_logger.removeHandler(handler)
 
     assert any(r.levelno == _logging.ERROR for r in log_records)
+
+
+def test_send_digest_posts_once_and_includes_union_codes() -> None:
+    """合并日报只 POST 一次，且正文包含并集中的代码。"""
+    settings = Settings(
+        db_path="data/test.db",
+        start_date="2024-01-01",
+        feishu_webhook_url="https://open.feishu.cn/open-apis/bot/v2/hook/abcdefgh",
+    )
+    notifier = FeishuNotifier(settings)
+    hits = {
+        "MaVolumeStrategy": ["510300", "159919"],
+        "TurtleTradeStrategy": ["510300"],
+    }
+    names = {"510300": "沪深300ETF", "159919": "深市ETF"}
+    with patch.object(FeishuNotifier, "_get_stock_names", return_value=names):
+        with patch("requests.post") as mock_post:
+            mock_resp = MagicMock(status_code=200)
+            mock_resp.json.return_value = {"code": 0}
+            mock_resp.text = "{}"
+            mock_post.return_value = mock_resp
+            notifier.send_digest(
+                hits,
+                turnover_by_symbol={"510300": 1e9, "159919": 1e6},
+                yesterday_section="**昨日推荐表现**\n\ntest",
+            )
+
+    assert mock_post.call_count == 1
+    called_url = mock_post.call_args.args[0]
+    assert called_url == settings.feishu_webhook_url
+    body = json.loads(mock_post.call_args.kwargs["data"])
+    text_blob = json.dumps(body, ensure_ascii=False)
+    assert "510300" in text_blob
+    assert "159919" in text_blob
+    assert "综合推荐" in text_blob or "Top10" in text_blob or "ETF 推荐" in text_blob
+    assert "昨日推荐表现" in text_blob
+
+
+def test_send_digest_uses_digest_webhook_when_configured() -> None:
+    digest_url = "https://open.feishu.cn/open-apis/bot/v2/hook/digestonly12"
+    settings = Settings(
+        db_path="data/test.db",
+        start_date="2024-01-01",
+        feishu_webhook_url="https://open.feishu.cn/open-apis/bot/v2/hook/mainwebhook",
+        strategy_webhooks={"digest": digest_url},
+    )
+    notifier = FeishuNotifier(settings)
+    with patch.object(FeishuNotifier, "_get_stock_names", return_value={}):
+        with patch("requests.post") as mock_post:
+            mock_resp = MagicMock(status_code=200)
+            mock_resp.json.return_value = {"code": 0}
+            mock_post.return_value = mock_resp
+            notifier.send_digest({})
+
+    assert mock_post.call_args.args[0] == digest_url

@@ -1,5 +1,6 @@
 """数据引擎模块：负责 SQLite 行情数据存储与 baostock 增量同步。"""
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -28,6 +29,13 @@ CREATE TABLE IF NOT EXISTS stock_daily (
 
 _CREATE_INDEX_SQL = """
 CREATE INDEX IF NOT EXISTS idx_symbol_date ON stock_daily (symbol, date);
+"""
+
+_CREATE_DIGEST_PICKS_SQL = """
+CREATE TABLE IF NOT EXISTS digest_top_picks (
+    asof_date TEXT PRIMARY KEY,
+    codes     TEXT NOT NULL
+);
 """
 
 
@@ -66,6 +74,7 @@ class DataEngine:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(_CREATE_TABLE_SQL)
             conn.execute(_CREATE_INDEX_SQL)
+            conn.execute(_CREATE_DIGEST_PICKS_SQL)
             conn.commit()
         logger.info(f"数据库初始化完成：{self.db_path}")
 
@@ -88,8 +97,8 @@ class DataEngine:
 
     @staticmethod
     def _to_baostock_code(symbol: str) -> str:
-        """将纯数字代码转为 baostock 格式：6/9开头 -> sh，其余 -> sz。"""
-        prefix = "sh" if symbol.startswith(("6", "9")) else "sz"
+        """将纯数字代码转为 baostock 格式：沪（5/6/9）-> sh，其余 -> sz（含深市 ETF）。"""
+        prefix = "sh" if symbol.startswith(("5", "6", "9")) else "sz"
         return f"{prefix}.{symbol}"
 
     # ── 数据同步 ──
@@ -108,7 +117,7 @@ class DataEngine:
             ).fetchall()
 
         if not rows:
-            logger.warning("本地无股票数据，请先执行 --backfill")
+            logger.warning("本地无 ETF 行情数据，请先执行 --backfill")
             return 0
 
         for symbol, last_date in rows:
@@ -120,10 +129,10 @@ class DataEngine:
             tasks.append((symbol, self._to_baostock_code(symbol), start, today_str))
 
         if not tasks:
-            logger.info("所有股票已是最新，无需更新")
+            logger.info("所有 ETF 已是最新，无需更新")
             return 0
 
-        logger.info(f"需要更新 {len(tasks)} 只股票，启动多进程并行拉取...")
+        logger.info(f"需要更新 {len(tasks)} 只 ETF，启动多进程并行拉取...")
 
         n_workers = min(8, len(tasks))
         chunks = [tasks[i::n_workers] for i in range(n_workers)]
@@ -296,10 +305,10 @@ class DataEngine:
 
         logger.info(f"回填完成 — 成功: {success} | 跳过: {skipped} | 失败: {failed}")
 
-    # ── 股票列表 ──
+    # ── 场内 ETF 列表 ──
 
     def get_all_symbols(self) -> list[str]:
-        """通过 baostock 获取全市场 A 股代码列表。"""
+        """通过 baostock 获取全市场 A 股场内 ETF 代码列表（type=5，上市 status=1）。"""
         import baostock as bs
 
         lg = bs.login()
@@ -312,15 +321,15 @@ class DataEngine:
             symbols = []
             while rs.next():
                 row = rs.get_row_data()
-                code = row[0]           # "sh.600000" or "sz.000001"
-                status = row[4]         # "1" = 上市
-                stock_type = row[5]     # "1" = 股票
-                if status == "1" and stock_type == "1":
-                    symbols.append(code.split(".")[1])  # 提取纯数字代码
-            logger.info(f"获取股票列表完成，共 {len(symbols)} 只")
+                code = row[0]  # "sh.510300" or "sz.159919"
+                sec_type = row[4]  # type：1 股票，5 ETF（见 baostock 文档）
+                listing_status = row[5]  # status：1 上市，0 退市
+                if listing_status == "1" and sec_type == "5":
+                    symbols.append(code.split(".")[1])  # 纯数字代码
+            logger.info(f"获取场内 ETF 列表完成，共 {len(symbols)} 只")
             return symbols
         except Exception as e:
-            logger.error(f"获取股票列表失败: {e}")
+            logger.error(f"获取场内 ETF 列表失败: {e}")
             return []
         finally:
             bs.logout()
@@ -331,3 +340,51 @@ class DataEngine:
                 "SELECT DISTINCT symbol FROM stock_daily"
             ).fetchall()
         return [row[0] for row in rows]
+
+    def get_latest_trade_date(self) -> str | None:
+        """全市场 K 线中的最新交易日（MAX(date)）。"""
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute("SELECT MAX(date) FROM stock_daily").fetchone()
+        return row[0] if row and row[0] else None
+
+    def get_next_trading_date_after(self, d: str) -> str | None:
+        """严格晚于 d 的最早交易日。"""
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT MIN(date) FROM stock_daily WHERE date > ?",
+                (d,),
+            ).fetchone()
+        return row[0] if row and row[0] else None
+
+    def save_digest_top_picks(self, asof_date: str, codes: list[str]) -> None:
+        """保存当日综合 Top 代码列表（JSON 数组），同 asof 重复运行则覆盖。"""
+        payload = json.dumps(codes, ensure_ascii=False)
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO digest_top_picks (asof_date, codes) VALUES (?, ?)",
+                (asof_date, payload),
+            )
+            conn.commit()
+
+    def load_digest_top_picks_strictly_before(self, asof_date: str) -> tuple[str | None, list[str]]:
+        """取严格早于 asof_date 的最近一期保存记录。"""
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT asof_date, codes FROM digest_top_picks WHERE asof_date < ? "
+                "ORDER BY asof_date DESC LIMIT 1",
+                (asof_date,),
+            ).fetchone()
+        if not row:
+            return None, []
+        return row[0], json.loads(row[1])
+
+    def load_digest_top_picks_second_latest(self) -> tuple[str | None, list[str]]:
+        """取按 asof_date 倒序的第二新一条（用于与「最新行情日」同一天重复跑时仍能对照上一期）。"""
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT asof_date, codes FROM digest_top_picks "
+                "ORDER BY asof_date DESC LIMIT 1 OFFSET 1"
+            ).fetchone()
+        if not row:
+            return None, []
+        return row[0], json.loads(row[1])
