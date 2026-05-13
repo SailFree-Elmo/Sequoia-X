@@ -39,26 +39,60 @@ CREATE TABLE IF NOT EXISTS digest_top_picks (
 """
 
 
-def _bs_fetch_batch(tasks: list) -> list:
-    """多进程 worker：独立 login，批量拉取 baostock 数据。"""
+def _bs_fetch_batch(tasks: list) -> dict:
+    """多进程 worker：独立 login，批量拉取 baostock 数据并带重试。"""
+    import time
     import baostock as bs
-    bs.login()
-    results = []
-    for symbol, bs_code, start, end in tasks:
-        rs = bs.query_history_k_data_plus(
-            bs_code,
-            "date,open,high,low,close,volume,amount",
-            start_date=start,
-            end_date=end,
-            frequency="d",
-            adjustflag="1",  # 后复权
-        )
-        if rs.error_code != "0":
-            continue
-        while rs.next():
-            results.append([symbol] + rs.get_row_data())
-    bs.logout()
-    return results
+
+    # 失败时返回完整失败清单，交给主进程统一告警。
+    login = bs.login()
+    if login.error_code != "0":
+        return {
+            "rows": [],
+            "failed_symbols": [symbol for symbol, *_ in tasks],
+            "retry_count": 0,
+        }
+
+    rows: list[list[str]] = []
+    failed_symbols: list[str] = []
+    retry_count = 0
+    max_retries = 3
+
+    try:
+        for symbol, bs_code, start, end in tasks:
+            fetched = False
+            for attempt in range(max_retries):
+                try:
+                    rs = bs.query_history_k_data_plus(
+                        bs_code,
+                        "date,open,high,low,close,volume,amount",
+                        start_date=start,
+                        end_date=end,
+                        frequency="d",
+                        adjustflag="1",  # 后复权
+                    )
+                    if rs.error_code != "0":
+                        raise RuntimeError(rs.error_msg)
+
+                    while rs.next():
+                        rows.append([symbol] + rs.get_row_data())
+                    fetched = True
+                    break
+                except Exception:
+                    retry_count += 1
+                    if attempt < max_retries - 1:
+                        time.sleep(2 ** attempt)
+
+            if not fetched:
+                failed_symbols.append(symbol)
+    finally:
+        bs.logout()
+
+    return {
+        "rows": rows,
+        "failed_symbols": failed_symbols,
+        "retry_count": retry_count,
+    }
 
 
 class DataEngine:
@@ -104,7 +138,7 @@ class DataEngine:
     # ── 数据同步 ──
 
     def sync_today_bulk(self) -> int:
-        """多进程并行通过 baostock 拉取增量数据（后复权），写入 SQLite。"""
+        """多进程并行通过 baostock 拉取增量数据（后复权），幂等写入 SQLite。"""
         from datetime import date, timedelta
         from multiprocessing import Pool
 
@@ -140,12 +174,23 @@ class DataEngine:
         with Pool(n_workers) as pool:
             batch_results = pool.map(_bs_fetch_batch, chunks)
 
-        all_rows = []
+        all_rows: list[list[str]] = []
+        failed_symbols: list[str] = []
+        retry_count = 0
         for batch in batch_results:
-            all_rows.extend(batch)
+            all_rows.extend(batch.get("rows", []))
+            failed_symbols.extend(batch.get("failed_symbols", []))
+            retry_count += int(batch.get("retry_count", 0))
 
         if not all_rows:
-            logger.info("无新数据（可能非交易日）")
+            if failed_symbols:
+                logger.warning(
+                    "本次增量未写入数据，且有 %d 只 ETF 拉取失败（例如: %s）",
+                    len(failed_symbols),
+                    ",".join(failed_symbols[:20]),
+                )
+            else:
+                logger.info("无新数据（可能非交易日）")
             return 0
 
         df = pd.DataFrame(all_rows, columns=["symbol", "date", "open", "high", "low", "close", "volume", "turnover"])
@@ -153,15 +198,36 @@ class DataEngine:
             df[col] = pd.to_numeric(df[col], errors="coerce")
         df = df.dropna(subset=["close"])
         df = df[df["volume"] > 0]
+        df = df.drop_duplicates(subset=["symbol", "date"], keep="last")
 
         count = len(df)
+        if count == 0:
+            logger.warning("抓取返回数据经清洗后为空，跳过写库")
+            return 0
+
+        records = list(
+            df[["symbol", "date", "open", "high", "low", "close", "volume", "turnover"]]
+            .itertuples(index=False, name=None)
+        )
         with sqlite3.connect(self.db_path) as conn:
-            for d in df["date"].unique().tolist():
-                conn.execute("DELETE FROM stock_daily WHERE date = ?", (d,))
-            df.to_sql("stock_daily", conn, if_exists="append", index=False, method="multi", chunksize=500)
+            conn.executemany(
+                "INSERT OR REPLACE INTO stock_daily "
+                "(symbol, date, open, high, low, close, volume, turnover) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                records,
+            )
             conn.commit()
 
-        logger.info(f"sync_today_bulk: 写入 {count} 条数据")
+        if failed_symbols:
+            logger.warning(
+                "sync_today_bulk: 写入 %d 条数据，失败 %d 只 ETF，重试 %d 次",
+                count,
+                len(failed_symbols),
+                retry_count,
+            )
+            logger.warning("失败样例代码: %s", ",".join(sorted(set(failed_symbols))[:30]))
+        else:
+            logger.info("sync_today_bulk: 写入 %d 条数据（重试 %d 次）", count, retry_count)
         return count
 
     def backfill(self, symbols: list[str]) -> None:

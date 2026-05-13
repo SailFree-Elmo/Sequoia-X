@@ -137,8 +137,8 @@ def test_send_digest_posts_once_and_includes_union_codes() -> None:
     text_blob = json.dumps(body, ensure_ascii=False)
     assert "510300" in text_blob
     assert "159919" in text_blob
-    assert "综合推荐" in text_blob or "Top10" in text_blob or "ETF 推荐" in text_blob
-    assert "昨日推荐表现" in text_blob
+    assert "Top5" in text_blob or "ETF 推荐" in text_blob
+    assert ("昨日表现" in text_blob) or ("昨日推荐表现" in text_blob)
 
 
 def test_send_digest_uses_digest_webhook_when_configured() -> None:
@@ -158,3 +158,79 @@ def test_send_digest_uses_digest_webhook_when_configured() -> None:
             notifier.send_digest({})
 
     assert mock_post.call_args.args[0] == digest_url
+
+
+def test_send_digest_morning_mode_hides_yesterday_block() -> None:
+    settings = Settings(
+        db_path="data/test.db",
+        start_date="2024-01-01",
+        feishu_webhook_url="https://open.feishu.cn/open-apis/bot/v2/hook/morningmode12",
+    )
+    notifier = FeishuNotifier(settings)
+    hits = {"MaVolumeStrategy": ["510300"]}
+    with patch.object(FeishuNotifier, "_get_stock_names", return_value={"510300": "沪深300ETF"}):
+        with patch("requests.post") as mock_post:
+            mock_resp = MagicMock(status_code=200)
+            mock_resp.json.return_value = {"code": 0}
+            mock_post.return_value = mock_resp
+            notifier.send_digest(hits, push_mode="morning", asof_date="2026-05-12")
+    body = json.loads(mock_post.call_args.kwargs["data"])
+    text_blob = json.dumps(body, ensure_ascii=False)
+    assert "盘前推荐" in text_blob
+    assert "昨日表现" not in text_blob
+
+
+def test_send_digest_close_mode_shows_yesterday_and_top() -> None:
+    settings = Settings(
+        db_path="data/test.db",
+        start_date="2024-01-01",
+        feishu_webhook_url="https://open.feishu.cn/open-apis/bot/v2/hook/closemode12",
+    )
+    notifier = FeishuNotifier(settings)
+    hits = {"MaVolumeStrategy": ["510300"]}
+    with patch.object(FeishuNotifier, "_get_stock_names", return_value={"510300": "沪深300ETF"}):
+        with patch("requests.post") as mock_post:
+            mock_resp = MagicMock(status_code=200)
+            mock_resp.json.return_value = {"code": 0}
+            mock_post.return_value = mock_resp
+            notifier.send_digest(
+                hits,
+                push_mode="close",
+                asof_date="2026-05-12",
+                yesterday_section="**昨日表现**\\n开盘买均值 +0.10%",
+            )
+    body = json.loads(mock_post.call_args.kwargs["data"])
+    text_blob = json.dumps(body, ensure_ascii=False)
+    assert "收盘复盘" in text_blob
+    assert "昨日表现" in text_blob
+    assert "稳健版 Top5" in text_blob
+
+
+def test_send_digest_includes_aggressive_section_when_provided() -> None:
+    settings = Settings(
+        db_path="data/test.db",
+        start_date="2024-01-01",
+        feishu_webhook_url="https://open.feishu.cn/open-apis/bot/v2/hook/aggrmode12",
+    )
+    notifier = FeishuNotifier(settings)
+    hits_main = {"MaVolumeStrategy": ["510300"]}
+    hits_alt = {"TurtleTradeStrategy": ["159919"]}
+    with patch.object(
+        FeishuNotifier,
+        "_get_stock_names",
+        return_value={"510300": "沪深300ETF", "159919": "深市ETF"},
+    ):
+        with patch("requests.post") as mock_post:
+            mock_resp = MagicMock(status_code=200)
+            mock_resp.json.return_value = {"code": 0}
+            mock_post.return_value = mock_resp
+            notifier.send_digest(
+                hits_main,
+                strategy_hits_alt=hits_alt,
+                push_mode="morning",
+                asof_date="2026-05-12",
+            )
+    body = json.loads(mock_post.call_args.kwargs["data"])
+    text_blob = json.dumps(body, ensure_ascii=False)
+    assert "稳健版 Top5" in text_blob
+    assert "激进版 Top5" in text_blob

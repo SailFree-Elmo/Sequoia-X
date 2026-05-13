@@ -35,11 +35,21 @@ python main.py --backfill    # 回填模式：全市场 ETF 历史 K 线灌库
 | **EtfStrongPullbackStrategy** | 强势日（默认约 3% 涨幅）后放量阴线回踩 |
 | **EtfUptrendSharpDropStrategy** | 上升趋势中放量单日大跌（幅度见 `sharp_drop_pct`） |
 | **RpsBreakoutStrategy** | ETF 池内 RPS 动量 + 阶段高点突破 |
-| **EtfDualMaTrendStrategy** | 连续多日 MA20>MA60 且收盘站上 MA20 |
+| **EtfDualMaTrendStrategy** | 连续多日 MA20>MA60 且收盘站上 MA20（默认关闭，可配置启用） |
 | **EtfMultiFactorStrategy** | 多因子横截面：流动性 + 趋势 + 动量 + 回撤硬筛，当日样本内分位秩加权打分（权重见 `etf_mf_weight_*`） |
 | **EtfTrendFollowStrategy** | 趋势跟随：收盘>MA20>MA60、MA20 上行、20/60 日动量为正、流动性与短期涨幅过滤，按价格相对 MA20 强度排序 |
+| **StrongTrendLowChaseStrategy** | 强趋势低追高隔夜：趋势多头 + 不过热 + 收盘质量过滤 |
+| **AdxMaRegimeTrendStrategy** | ADX 趋势强度 + MA20/MA60 多头 + ATR 风险过滤 |
+| **VolumeContractionBreakoutStrategy** | 缩量收敛后放量突破，过滤假突破 |
+| **IndustryRelativeStrengthRotationStrategy** | 行业/主题分桶相对强弱轮动（先择强组，再选组内强势ETF） |
+| **NewsSentimentBreadthStrategy** | 消息面情绪扩散策略（读取 `NEWS_SIGNAL_PATH` JSON，默认关闭） |
+| **DualMomentumRotationStrategy** | 双动量轮动：相对动量（20/60日）+ 绝对动量（站上MA60） |
+| **TrendStabilityMomentumStrategy** | 趋势稳健动量：年化斜率 × R²，过滤伪动量 |
+| **LowVolMomentumBlendStrategy** | 低波动动量融合：动量分位 + 波动惩罚，偏高胜率 |
 
 阈值可在 [sequoia_x/core/config.py](sequoia_x/core/config.py) 的 `Settings` 中通过环境变量覆盖（如 `TURTLE_MIN_TURNOVER`、`STRONG_DAY_PCT` 等）。
+
+系统会在每日运行时先计算市场状态（`risk_on/risk_off`），`risk_off` 默认关闭反转类策略并对各策略分组权重进行调整。
 
 ---
 
@@ -97,6 +107,7 @@ Sequoia-X/
 ├── sequoia_x/
 │   ├── core/config.py
 │   ├── data/engine.py           # ETF 列表筛选 + 回填 + 增量同步
+│   │   └── news_adapter.py      # 消息面信号适配（JSON）
 │   ├── strategy/
 │   │   ├── base.py
 │   │   ├── turtle_trade.py
@@ -107,7 +118,16 @@ Sequoia-X/
 │   │   ├── rps_breakout.py
 │   │   ├── etf_dual_ma_trend.py
 │   │   ├── etf_multi_factor.py
-│   │   └── etf_trend_follow.py
+│   │   ├── etf_trend_follow.py
+│   │   ├── strong_trend_low_chase.py
+│   │   ├── market_regime_filter.py
+│   │   ├── adx_ma_regime_trend.py
+│   │   ├── volume_contraction_breakout.py
+│   │   ├── industry_relative_strength_rotation.py
+│   │   ├── news_sentiment_breadth.py
+│   │   ├── dual_momentum_rotation.py
+│   │   ├── trend_stability_momentum.py
+│   │   └── low_vol_momentum_blend.py
 │   └── notify/
 │       ├── feishu.py          # 飞书推送（含 send_digest）
 │       ├── digest.py          # 合并计分与 Top N

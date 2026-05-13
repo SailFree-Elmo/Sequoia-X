@@ -1,6 +1,7 @@
 """飞书通知模块：将 ETF 筛选结果通过 Webhook 推送至飞书群。"""
 
 import json
+import time
 from datetime import date
 
 import requests
@@ -29,6 +30,7 @@ class FeishuNotifier:
             settings: Settings 实例，提供 Webhook URL 配置。
         """
         self.settings = settings
+        self._last_send_ts: float = 0.0
 
     @staticmethod
     def _to_xueqiu_code(code: str) -> str:
@@ -116,44 +118,42 @@ class FeishuNotifier:
         prev_codes: list[str],
         current_asof: str | None,
         top_n: int,
+        *,
+        detailed: bool = False,
     ) -> str:
-        """上一期保存的 Top 在次一交易日的表现；无数据时也返回说明文案（飞书表格兼容性差，用列表）。"""
-        header = "**昨日推荐表现**"
+        """上一期保存的 Top 在次一交易日的表现，返回简洁摘要。"""
+        header = "**昨日表现**"
         if not current_asof:
-            return f"{header}\n\n暂无：本地库中无行情日期（请先 backfill 并同步）。"
+            return f"{header}：暂无（无行情数据）"
         if not prev_asof or not prev_codes:
-            return (
-                f"{header}\n\n暂无：尚无上一期保存的综合 Top（需至少成功跑完 1 次日常模式写入 "
-                f"`digest_top_picks` 后，在下一交易日行情入库后再跑，即可显示对照）。"
-            )
+            return f"{header}：暂无（缺少上一期记录）"
         d_next = engine.get_next_trading_date_after(prev_asof)
         if not d_next or d_next > current_asof:
-            return (
-                f"{header}\n\n暂无：推荐截止 **{prev_asof}** 的次一交易日 "
-                f"**尚未出现在库中**（当前最新行情日为 **{current_asof}**），请待增量同步后再看。"
-            )
+            return f"{header}：暂无（上一期 {prev_asof} 的次日未入库）"
         rows, avg_o, avg_c = compute_pick_followthrough(
             engine, prev_asof, d_next, prev_codes, max_rows=top_n
         )
-        codes = sorted({r.code for r in rows})
-        names = self._get_stock_names(codes) if codes else {}
-        lines: list[str] = [
-            f"{header}（推荐截止 **{prev_asof}**，观测日 **{d_next}**）",
-            "",
-            "开盘买：下一交易日开盘进、收盘出；收盘买：推荐日收盘进，下一交易日收盘出。",
-            "",
-        ]
-        for i, r in enumerate(rows, start=1):
-            nm = names.get(r.code, r.code)
-            link = self._link_line(r.code, nm)
-            lines.append(
-                f"{i}. {link}  ·  开盘买 {format_pct(r.pct_open_buy)}  ·  收盘买 {format_pct(r.pct_close_buy)}"
-            )
-        lines.append("")
-        lines.append(
-            f"**等权均值**：开盘买 {format_pct(avg_o)} · 收盘买 {format_pct(avg_c)}"
+        valid_count = sum(1 for r in rows if r.pct_open_buy is not None or r.pct_close_buy is not None)
+        if detailed:
+            codes = sorted({r.code for r in rows})
+            names = self._get_stock_names(codes) if codes else {}
+            lines: list[str] = [
+                f"{header}（{prev_asof}→{d_next}，样本 {valid_count}/{len(rows)}）",
+                "",
+            ]
+            for i, r in enumerate(rows, start=1):
+                nm = names.get(r.code, r.code)
+                link = self._link_line(r.code, nm)
+                lines.append(
+                    f"{i}. {link} · 开盘买 {format_pct(r.pct_open_buy)} · 收盘买 {format_pct(r.pct_close_buy)}"
+                )
+            lines.append("")
+            lines.append(f"开盘买均值 {format_pct(avg_o)} · 收盘买均值 {format_pct(avg_c)}")
+            return "\n".join(lines)
+        return (
+            f"{header}（{prev_asof}→{d_next}，样本 {valid_count}/{len(rows)}）"
+            f"\n开盘买均值 {format_pct(avg_o)} · 收盘买均值 {format_pct(avg_c)}"
         )
-        return "\n".join(lines)
 
     def _build_digest_card(
         self,
@@ -161,29 +161,56 @@ class FeishuNotifier:
         turnover_by_symbol: dict[str, float] | None,
         *,
         yesterday_section: str | None = None,
+        strategy_weights: dict[str, float] | None = None,
+        strategy_groups: dict[str, str] | None = None,
+        group_multipliers: dict[str, float] | None = None,
+        push_mode: str = "intraday",
+        asof_date: str | None = None,
+        top_n_override: int | None = None,
+        strategy_hits_alt: dict[str, list[str]] | None = None,
+        strategy_weights_alt: dict[str, float] | None = None,
+        strategy_groups_alt: dict[str, str] | None = None,
+        group_multipliers_alt: dict[str, float] | None = None,
     ) -> dict:
-        """综合推荐 TopN；「昨日推荐表现」区块在上（默认可为占位说明）。"""
+        """综合推荐卡片：按 push_mode 生成 morning/close/intraday 三类视图。"""
         today = date.today().strftime("%Y-%m-%d")
-        top_n = self.settings.feishu_digest_top_n
+        if top_n_override is not None:
+            top_n = top_n_override
+        elif push_mode == "morning":
+            top_n = self.settings.feishu_morning_top_n
+        else:
+            top_n = self.settings.feishu_digest_top_n
 
         all_codes: set[str] = set()
         for lst in strategy_hits.values():
             all_codes.update(lst)
+        if strategy_hits_alt:
+            for lst in strategy_hits_alt.values():
+                all_codes.update(lst)
 
         elements: list[dict] = []
+        stale_data = bool(asof_date) and asof_date != today
+        if asof_date:
+            asof_text = f"**数据基准日**：{asof_date}"
+            if stale_data:
+                asof_text += "（非当日最新）"
+            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": asof_text}})
+            elements.append({"tag": "hr"})
 
-        y_block = yesterday_section or "**昨日推荐表现**\n\n暂无：未生成对照区块。"
-        elements.append({"tag": "div", "text": {"tag": "lark_md", "content": y_block}})
-        elements.append({"tag": "hr"})
+        if push_mode in {"close", "intraday"}:
+            y_block = yesterday_section or "**昨日表现**：暂无"
+            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": y_block}})
+            elements.append({"tag": "hr"})
 
         if not all_codes:
-            body = f"**{today}**\n\n今日无命中。"
+            title = "Sequoia-X ETF 收盘复盘" if push_mode == "close" else "Sequoia-X ETF 推荐"
+            body = f"**{today}**\n今日无推荐。"
             elements.append({"tag": "div", "text": {"tag": "lark_md", "content": body}})
             return {
                 "msg_type": "interactive",
                 "card": {
                     "header": {
-                        "title": {"tag": "plain_text", "content": "Sequoia-X ETF 推荐"},
+                        "title": {"tag": "plain_text", "content": title},
                         "template": "blue",
                     },
                     "elements": elements,
@@ -191,24 +218,59 @@ class FeishuNotifier:
             }
 
         names = self._get_stock_names(sorted(all_codes))
-        picks = rank_top_picks(strategy_hits, turnover_by_symbol, top_n=top_n)
-
-        lines: list[str] = [
-            f"**{today}**  综合推荐 **Top{top_n}**（命中策略数 / Borda / 成交额）",
-            "",
-        ]
-        for i, p in enumerate(picks, start=1):
+        picks_main = rank_top_picks(
+            strategy_hits,
+            turnover_by_symbol,
+            top_n=top_n,
+            strategy_weights=strategy_weights,
+            strategy_groups=strategy_groups,
+            group_multipliers=group_multipliers,
+        )
+        lines_main: list[str] = [f"**稳健版 Top{top_n}**", ""]
+        for i, p in enumerate(picks_main, start=1):
             nm = names.get(p.code, p.code)
-            lines.append(f"{i}. {self._link_line(p.code, nm)}  ·  **{p.vote_count}** 票")
+            lines_main.append(
+                f"{i}. {self._link_line(p.code, nm)} · {p.vote_count}票 / 加权{p.vote_score:.2f}"
+            )
+        elements.append({"tag": "div", "text": {"tag": "lark_md", "content": "\n".join(lines_main)}})
 
-        body = "\n".join(lines)
-        elements.append({"tag": "div", "text": {"tag": "lark_md", "content": body}})
+        if strategy_hits_alt:
+            picks_alt = rank_top_picks(
+                strategy_hits_alt,
+                turnover_by_symbol,
+                top_n=top_n,
+                strategy_weights=strategy_weights_alt,
+                strategy_groups=strategy_groups_alt,
+                group_multipliers=group_multipliers_alt,
+            )
+            lines_alt: list[str] = [f"**激进版 Top{top_n}**", ""]
+            for i, p in enumerate(picks_alt, start=1):
+                nm = names.get(p.code, p.code)
+                lines_alt.append(
+                    f"{i}. {self._link_line(p.code, nm)} · {p.vote_count}票 / 加权{p.vote_score:.2f}"
+                )
+            elements.append({"tag": "hr"})
+            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": "\n".join(lines_alt)}})
+
+        if push_mode == "intraday" and self.settings.feishu_enable_intraday_warning:
+            warn = (
+                f"**盘中提示**：当前为盘中快照，最新日K为 `{asof_date or '未知'}`，"
+                "请勿将其视为当日收盘结论。"
+            )
+            elements.append({"tag": "hr"})
+            elements.append({"tag": "div", "text": {"tag": "lark_md", "content": warn}})
+
+        title_map = {
+            "morning": "Sequoia-X ETF 盘前推荐",
+            "close": "Sequoia-X ETF 收盘复盘",
+            "intraday": "Sequoia-X ETF 盘中播报",
+        }
 
         return {
             "msg_type": "interactive",
             "card": {
                 "header": {
-                    "title": {"tag": "plain_text", "content": "Sequoia-X ETF 推荐"},
+                    "title": {"tag": "plain_text", "content": title_map.get(push_mode, "Sequoia-X ETF 推荐")},
                     "template": "blue",
                 },
                 "elements": elements,
@@ -221,20 +283,72 @@ class FeishuNotifier:
         *,
         turnover_by_symbol: dict[str, float] | None = None,
         yesterday_section: str | None = None,
+        strategy_weights: dict[str, float] | None = None,
+        strategy_groups: dict[str, str] | None = None,
+        group_multipliers: dict[str, float] | None = None,
+        push_mode: str = "intraday",
+        asof_date: str | None = None,
+        strategy_hits_alt: dict[str, list[str]] | None = None,
+        strategy_weights_alt: dict[str, float] | None = None,
+        strategy_groups_alt: dict[str, str] | None = None,
+        group_multipliers_alt: dict[str, float] | None = None,
     ) -> None:
         """合并多策略结果，**单次** POST 至 digest Webhook（未配置则用主 Webhook）。"""
         url = self.settings.get_webhook_url("digest")
-        payload = self._build_digest_card(
-            strategy_hits, turnover_by_symbol, yesterday_section=yesterday_section
+        top_n = (
+            self.settings.feishu_morning_top_n if push_mode == "morning" else self.settings.feishu_digest_top_n
         )
+        payload = self._build_digest_card(
+            strategy_hits,
+            turnover_by_symbol,
+            yesterday_section=yesterday_section,
+            strategy_weights=strategy_weights,
+            strategy_groups=strategy_groups,
+            group_multipliers=group_multipliers,
+            push_mode=push_mode,
+            asof_date=asof_date,
+            top_n_override=top_n,
+            strategy_hits_alt=strategy_hits_alt,
+            strategy_weights_alt=strategy_weights_alt,
+            strategy_groups_alt=strategy_groups_alt,
+            group_multipliers_alt=group_multipliers_alt,
+        )
+        max_bytes = int(self.settings.feishu_card_max_bytes_guard)
+        encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        while len(encoded) > max_bytes and top_n > 1 and push_mode != "close":
+            top_n -= 1
+            payload = self._build_digest_card(
+                strategy_hits,
+                turnover_by_symbol,
+                yesterday_section=yesterday_section,
+                strategy_weights=strategy_weights,
+                strategy_groups=strategy_groups,
+                group_multipliers=group_multipliers,
+                push_mode=push_mode,
+                asof_date=asof_date,
+                top_n_override=top_n,
+                strategy_hits_alt=strategy_hits_alt,
+                strategy_weights_alt=strategy_weights_alt,
+                strategy_groups_alt=strategy_groups_alt,
+                group_multipliers_alt=group_multipliers_alt,
+            )
+            encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        if len(encoded) > max_bytes:
+            logger.warning("飞书卡片体积仍超过限制：%d bytes", len(encoded))
+
+        min_interval = float(self.settings.feishu_send_min_interval_seconds)
+        elapsed = time.time() - self._last_send_ts
+        if elapsed < min_interval:
+            time.sleep(min_interval - elapsed)
 
         try:
             resp = requests.post(
                 url,
-                data=json.dumps(payload),
+                data=encoded.decode("utf-8"),
                 headers={"Content-Type": "application/json"},
                 timeout=15,
             )
+            self._last_send_ts = time.time()
             resp_json = resp.json()
 
             if resp.status_code != 200 or resp_json.get("code") != 0:

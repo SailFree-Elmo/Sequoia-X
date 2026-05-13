@@ -1,6 +1,7 @@
 """主程序入口属性测试。"""
 
 import sys
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
@@ -21,3 +22,10 @@ def test_main_exits_nonzero_on_exception(error_msg: str) -> None:
         with pytest.raises(SystemExit) as exc_info:
             main_module.main()
         assert exc_info.value.code != 0
+
+
+def test_resolve_push_mode_auto_by_time() -> None:
+    assert main_module.resolve_push_mode("auto", datetime(2026, 5, 13, 8, 0, 0)) == "morning"
+    assert main_module.resolve_push_mode("auto", datetime(2026, 5, 13, 10, 0, 0)) == "intraday"
+    assert main_module.resolve_push_mode("auto", datetime(2026, 5, 13, 16, 0, 0)) == "close"
+    assert main_module.resolve_push_mode("morning", datetime(2026, 5, 13, 16, 0, 0)) == "morning"

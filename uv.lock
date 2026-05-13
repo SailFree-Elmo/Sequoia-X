@@ -1117,6 +1117,7 @@ name = "sequoia-x"
 version = "2.0.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "akshare" },
     { name = "baostock" },
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pandas", version = "3.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -1135,6 +1136,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "akshare", specifier = ">=1.18.60" },
     { name = "baostock", specifier = ">=0.9" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.100" },
     { name = "pandas", specifier = ">=2.0" },

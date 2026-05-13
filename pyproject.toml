@@ -9,6 +9,7 @@ dependencies = [
     "rich>=13.0",
     "pandas>=2.0",
     "requests>=2.31",
+    "akshare>=1.18.60",
 ]
 
 [project.optional-dependencies]

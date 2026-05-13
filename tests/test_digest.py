@@ -14,7 +14,7 @@ def test_union_and_votes() -> None:
     }
     assert union_symbol_count(hits) == 3
     agg = aggregate_votes_and_borda(hits)
-    assert agg["222222"][0] == 2  # votes
+    assert agg["222222"][0] == 2  # raw votes
     assert agg["111111"][0] == 1
     assert agg["333333"][0] == 1
 
@@ -27,7 +27,7 @@ def test_borda_same_votes_tiebreak_turnover() -> None:
     }
     agg = aggregate_votes_and_borda(hits)
     # 111111: 1 + 0.5 = 1.5, 222222: 0.5 + 1 = 1.5
-    assert agg["111111"][1] == agg["222222"][1] == 1.5
+    assert agg["111111"][2] == agg["222222"][2] == 1.5
 
     to_low = {"111111": 100.0, "222222": 200.0}
     top = rank_top_picks(hits, to_low, top_n=2)
@@ -49,6 +49,21 @@ def test_rank_top_picks_order_by_votes_then_borda() -> None:
     top = rank_top_picks(hits, None, top_n=10)
     codes = [p.code for p in top]
     assert codes == ["300000", "100000", "200000"]
+
+
+def test_weighted_rank_respects_strategy_weights() -> None:
+    hits = {
+        "TrendA": ["111111"],
+        "TrendB": ["222222"],
+    }
+    top = rank_top_picks(
+        hits,
+        None,
+        top_n=2,
+        strategy_weights={"TrendA": 2.0, "TrendB": 1.0},
+    )
+    assert [p.code for p in top] == ["111111", "222222"]
+    assert top[0].vote_score > top[1].vote_score
 
 
 def test_empty_hits() -> None:
