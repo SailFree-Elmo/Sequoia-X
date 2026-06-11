@@ -51,6 +51,17 @@ python main.py --backfill    # 回填模式：全市场 ETF 历史 K 线灌库
 
 系统会在每日运行时先计算市场状态（`risk_on/risk_off`），`risk_off` 默认关闭反转类策略并对各策略分组权重进行调整。
 
+### 策略默认启停（减负 / 回测加速）
+
+以下策略在默认配置中为 **关闭**（基于近期月度 Top1 回测样本中极少或从未出现在最终 Top1 共命中列表；关闭可减少全市场扫描时间）。需要时可在 `.env` 中设为 `true`（变量名见 `.env.example`）：
+
+- `MaVolumeStrategy`（`ENABLE_MA_VOLUME_STRATEGY`）
+- `HighTightFlagStrategy`（`ENABLE_HIGH_TIGHT_FLAG_STRATEGY`）
+- `VolumeContractionBreakoutStrategy`（`ENABLE_VOLUME_CONTRACTION_BREAKOUT_STRATEGY`）
+- `EtfDualMaTrendStrategy`、`NewsSentimentBreadthStrategy` 等仍默认关闭，可按需打开。
+
+**激进画像** 不再强制打开「强势回踩 / 上升趋势大跌」类策略；与稳健一致由 `.env` 控制 `ENABLE_ETF_STRONG_PULLBACK_STRATEGY`、`ENABLE_ETF_UPTREND_SHARP_DROP_STRATEGY`。
+
 ---
 
 ## 快速开始 | Quick Start

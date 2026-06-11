@@ -14,7 +14,7 @@ from sequoia_x.notify.feishu import FeishuNotifier
 
 def make_settings(webhook_url: str = "https://example.com/default") -> Settings:
     return Settings(
-        db_path="data/test.db",
+        database_url="postgresql://user:pass@127.0.0.1:5433/test_db",
         start_date="2024-01-01",
         feishu_webhook_url=webhook_url,
     )
@@ -108,7 +108,7 @@ def test_http_failure_logs_error(status_code: int) -> None:
 def test_send_digest_posts_once_and_includes_union_codes() -> None:
     """合并日报只 POST 一次，且正文包含并集中的代码。"""
     settings = Settings(
-        db_path="data/test.db",
+        database_url="postgresql://user:pass@127.0.0.1:5433/test_db",
         start_date="2024-01-01",
         feishu_webhook_url="https://open.feishu.cn/open-apis/bot/v2/hook/abcdefgh",
     )
@@ -144,7 +144,7 @@ def test_send_digest_posts_once_and_includes_union_codes() -> None:
 def test_send_digest_uses_digest_webhook_when_configured() -> None:
     digest_url = "https://open.feishu.cn/open-apis/bot/v2/hook/digestonly12"
     settings = Settings(
-        db_path="data/test.db",
+        database_url="postgresql://user:pass@127.0.0.1:5433/test_db",
         start_date="2024-01-01",
         feishu_webhook_url="https://open.feishu.cn/open-apis/bot/v2/hook/mainwebhook",
         strategy_webhooks={"digest": digest_url},
@@ -162,7 +162,7 @@ def test_send_digest_uses_digest_webhook_when_configured() -> None:
 
 def test_send_digest_morning_mode_hides_yesterday_block() -> None:
     settings = Settings(
-        db_path="data/test.db",
+        database_url="postgresql://user:pass@127.0.0.1:5433/test_db",
         start_date="2024-01-01",
         feishu_webhook_url="https://open.feishu.cn/open-apis/bot/v2/hook/morningmode12",
     )
@@ -182,7 +182,7 @@ def test_send_digest_morning_mode_hides_yesterday_block() -> None:
 
 def test_send_digest_close_mode_shows_yesterday_and_top() -> None:
     settings = Settings(
-        db_path="data/test.db",
+        database_url="postgresql://user:pass@127.0.0.1:5433/test_db",
         start_date="2024-01-01",
         feishu_webhook_url="https://open.feishu.cn/open-apis/bot/v2/hook/closemode12",
     )
@@ -208,7 +208,7 @@ def test_send_digest_close_mode_shows_yesterday_and_top() -> None:
 
 def test_send_digest_includes_aggressive_section_when_provided() -> None:
     settings = Settings(
-        db_path="data/test.db",
+        database_url="postgresql://user:pass@127.0.0.1:5433/test_db",
         start_date="2024-01-01",
         feishu_webhook_url="https://open.feishu.cn/open-apis/bot/v2/hook/aggrmode12",
     )

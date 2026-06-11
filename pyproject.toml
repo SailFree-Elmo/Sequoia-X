@@ -10,6 +10,7 @@ dependencies = [
     "pandas>=2.0",
     "requests>=2.31",
     "akshare>=1.18.60",
+    "psycopg[binary]>=3.2",
 ]
 
 [project.optional-dependencies]

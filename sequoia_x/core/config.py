@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    db_path: str = "data/etf_sequoia.db"
+    database_url: str
     start_date: str = "2024-01-01"
     feishu_webhook_url: str  # 必填字段，缺失时抛出 ValidationError
     strategy_webhooks: dict[str, str] = {}
@@ -43,10 +43,10 @@ class Settings(BaseSettings):
     feishu_send_min_interval_seconds: float = 0.25
     feishu_enable_intraday_warning: bool = True
 
-    # 策略启停（默认关闭与主策略重叠较高的双均线策略）
-    enable_ma_volume_strategy: bool = True
+    # 策略启停（双均线默认关；MaVolume/高窄旗/缩量突破默认关：回测样本期 Top1 共命中极少，关可减负；可用 ENABLE_* 打开）
+    enable_ma_volume_strategy: bool = False
     enable_turtle_trade_strategy: bool = True
-    enable_high_tight_flag_strategy: bool = True
+    enable_high_tight_flag_strategy: bool = False
     enable_etf_strong_pullback_strategy: bool = False
     enable_etf_uptrend_sharp_drop_strategy: bool = False
     enable_rps_breakout_strategy: bool = True
@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     enable_etf_multi_factor_strategy: bool = True
     enable_etf_trend_follow_strategy: bool = True
     enable_adx_ma_regime_trend_strategy: bool = True
-    enable_volume_contraction_breakout_strategy: bool = True
+    enable_volume_contraction_breakout_strategy: bool = False
     enable_industry_relative_strength_rotation_strategy: bool = True
     enable_news_sentiment_breadth_strategy: bool = False
     enable_strong_trend_low_chase_strategy: bool = True
@@ -109,6 +109,8 @@ class Settings(BaseSettings):
     vcb_contraction_max_range_ratio: float = 0.10
     vcb_volume_breakout_multiplier: float = 1.8
     vcb_min_turnover_20d: float = 8_000_000.0
+    vcb_max_5d_return_pct: float = 0.10
+    vcb_min_close_position_ratio: float = 0.65
     vcb_max_5d_return_pct: float = 0.10
     vcb_min_close_position_ratio: float = 0.70
 

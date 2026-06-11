@@ -22,8 +22,6 @@ class VolumeContractionBreakoutStrategy(BaseStrategy):
         max_range_ratio = self.settings.vcb_contraction_max_range_ratio
         vol_mult = self.settings.vcb_volume_breakout_multiplier
         min_turn20 = self.settings.vcb_min_turnover_20d
-        max_5d = self.settings.vcb_max_5d_return_pct
-        min_close_pos = self.settings.vcb_min_close_position_ratio
 
         for symbol in symbols:
             try:
@@ -55,29 +53,11 @@ class VolumeContractionBreakoutStrategy(BaseStrategy):
                 if float(v.iloc[-1]) < vol_ma20 * vol_mult:
                     continue
 
-                c5 = float(c.iloc[-6])
-                if c5 <= 0:
-                    continue
-                r5 = c0 / c5 - 1.0
-                if r5 > max_5d:
-                    continue
-
-                day_range = float(h.iloc[-1] - l.iloc[-1])
-                if day_range <= 0:
-                    continue
-                close_pos_ratio = float(c0 - l.iloc[-1]) / day_range
-                if close_pos_ratio < min_close_pos:
-                    continue
-
                 turn20 = float(t.iloc[-20:].mean())
                 if turn20 < min_turn20:
                     continue
 
-                score = (
-                    (c0 / breakout_h - 1.0)
-                    + (float(v.iloc[-1]) / vol_ma20 - 1.0)
-                    + close_pos_ratio * 0.2
-                )
+                score = (c0 / breakout_h - 1.0) + (float(v.iloc[-1]) / vol_ma20 - 1.0)
                 if math.isnan(score):
                     continue
                 selected.append((symbol, score))

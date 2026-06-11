@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>2026回测详细报告 - Sequoia-X</title>
+  <style>
+    body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif; margin: 28px; color: #1f2937; }
+    h1,h2,h3 { margin: 0 0 12px 0; }
+    .meta { color: #4b5563; margin-bottom: 18px; line-height: 1.7; }
+    .card { border: 1px solid #e5e7eb; border-radius: 10px; background: #f9fafb; padding: 14px 16px; margin: 14px 0; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0 16px 0; font-size: 14px; }
+    th, td { border: 1px solid #e5e7eb; padding: 8px 10px; }
+    th { background: #f3f4f6; text-align: left; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    ul { margin: 6px 0 0 0; }
+    .footnote { color:#6b7280; font-size:12px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>2026 年回测详细报告（Top1 交易版）</h1>
+  <div class="meta">
+    报告生成时间：2026-05-14 12:39:44<br/>
+    数据评估区间：2026-01-01 ~ 2026-05-13<br/>
+    预热窗口：目标 2025-01-01，实际数据起点 2025-01-02<br/>
+    初始资金：100,000 元
+  </div>
+
+  <div class="card">
+    <h3>样本覆盖</h3>
+    <ul>
+      <li>2025 年数据行数：267169</li>
+      <li>2025 年覆盖标的数：1324</li>
+    </ul>
+  </div>
+
+  <h2>回测口径</h2>
+  <ul>
+    <li>信号生成：每个信号日收盘生成 Top5 推荐，实际只买 Top1。</li>
+    <li>交易规则：次日开盘买入，再下一个交易日开盘卖出（O→O，持有 1 夜）。</li>
+    <li>仓位规则：单票满仓。</li>
+    <li>交易成本：手续费双边万 0.5（免五）。</li>
+    <li>缺失处理：若买/卖日无开盘价，该腿现金保留。</li>
+  </ul>
+
+  <h2>结果总览</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>画像</th>
+        <th class="num">期末资金</th>
+        <th class="num">累计收益</th>
+        <th class="num">年化收益(252日折算)</th>
+        <th class="num">最大回撤</th>
+        <th class="num">成交次数</th>
+        <th class="num">胜率</th>
+        <th class="num">单笔平均收益</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>稳健版</td><td class="num">激进版</td><td class="num"></td><td class="num">---</td><td class="num">---:</td><td class="num">---:</td><td class="num"></td><td class="num">2026-02</td></tr>
+      <tr><td>激进版</td><td class="num">146,842.93</td><td class="num">46.8429%</td><td class="num">230.4444%</td><td class="num">-24.7252%</td><td class="num">81</td><td class="num">56.7901%</td><td class="num">0.5703%</td></tr>
+    </tbody>
+  </table>
+
+  <h2>月度收益拆解</h2>
+  <table>
+    <thead><tr><th>月份</th><th class="num">稳健版</th><th class="num">激进版</th></tr></thead>
+    <tbody>
+      <tr><td>2026-02</td><td class='num'>-2.1256%</td><td class='num'>4.5779%</td></tr><tr><td>2026-03</td><td class='num'>13.1093%</td><td class='num'>12.2901%</td></tr><tr><td>2026-04</td><td class='num'>-6.4261%</td><td class='num'>-5.2924%</td></tr><tr><td>2026-05</td><td class='num'>-63.6884%</td><td class='num'>9.6425%</td></tr>
+    </tbody>
+  </table>
+
+  <h2>解读与结论</h2>
+  <div class="card">
+    <ul>
+      <li>同样 Top1 口径下，激进版在样本期获得正收益，但回撤仍较明显。</li>
+      <li>稳健版在 2026-05 出现显著回撤，说明当前参数对近期市场风格适配偏弱。</li>
+      <li>两画像差异较大，建议后续做按市场状态切换画像，或把 Top1 扩展为 Top2 等权以降低单票波动风险。</li>
+      <li>建议增加滚动窗口稳定性检验（按月 walk-forward），避免阶段性过拟合。</li>
+    </ul>
+  </div>
+
+  <div class="footnote">数据来源：/root/code/Sequoia-X/results/backtest_2026_profiles_top1_20260514.md（本次按 HTML 详细格式整理输出）</div>
+</body>
+</html>

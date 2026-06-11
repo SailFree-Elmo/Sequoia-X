@@ -1,0 +1,109 @@
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>Sequoia-X 2026详细回测报告</title>
+  <style>
+    body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif; margin: 24px; color: #222; }
+    h1,h2,h3 { margin: 0 0 12px 0; }
+    .meta { margin-bottom: 16px; color: #555; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 14px; margin: 12px 0; background:#fafafa; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 14px; }
+    th, td { border: 1px solid #ddd; padding: 8px 10px; }
+    th { background: #f4f6f8; text-align: left; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .muted { color: #666; font-size: 13px; }
+    ul { margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Sequoia-X 2026 年详细回测报告（双画像）</h1>
+  <div class="meta">
+    生成时间：2026-05-14 12:51:31<br/>
+    评估区间：2026-01-01 ~ 2026-05-13<br/>
+    预热目标起点：2025-01-01；实际可用最早数据：2025-01-02<br/>
+    交易口径：信号 Top5，实际买入 Top1，O→O 持有 1 夜，手续费双边万 0.5，单票满仓/等权（按买入数）<br/>
+    初始资金：100,000.00 元
+  </div>
+
+  <div class="card">
+    <h3>数据覆盖</h3>
+    <ul>
+      <li>2025 年数据行数：267,169</li>
+      <li>2025 年覆盖标的数：1,324</li>
+      <li>2026 评估交易日数：83</li>
+    </ul>
+  </div>
+
+  <h2>结果总览</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>画像</th>
+        <th class="num">期末资金</th>
+        <th class="num">累计收益</th>
+        <th class="num">年化收益(252折算)</th>
+        <th class="num">最大回撤</th>
+        <th class="num">成交次数</th>
+        <th class="num">胜率</th>
+        <th class="num">单笔平均收益</th>
+        <th class="num">单笔波动</th>
+        <th class="num">交易Sharpe(252折算)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>稳健版</td>
+        <td class="num">119,476.90</td>
+        <td class="num">19.4769%</td>
+        <td class="num">73.9558%</td>
+        <td class="num">-20.6539%</td>
+        <td class="num">81</td>
+        <td class="num">53.0864%</td>
+        <td class="num">0.2669%</td>
+        <td class="num">3.0745%</td>
+        <td class="num">1.3781</td>
+      </tr>
+      <tr>
+        <td>激进版</td>
+        <td class="num">99,178.92</td>
+        <td class="num">-0.8211%</td>
+        <td class="num">-2.5324%</td>
+        <td class="num">-38.1126%</td>
+        <td class="num">81</td>
+        <td class="num">50.6173%</td>
+        <td class="num">0.0536%</td>
+        <td class="num">3.5579%</td>
+        <td class="num">0.2391</td>
+      </tr>
+      <tr>
+        <td>基准(510300 O→O)</td>
+        <td class="num">-</td>
+        <td class="num">3.2825%</td>
+        <td class="num">-</td>
+        <td class="num">-</td>
+        <td class="num">-</td>
+        <td class="num">-</td>
+        <td class="num">-</td>
+        <td class="num">-</td>
+        <td class="num">-</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>月度收益（按月末权益变动）</h2>
+  <table>
+    <thead><tr><th>月份</th><th class="num">稳健版</th><th class="num">激进版</th></tr></thead>
+    <tbody>
+      <tr><td>2026-01</td><td class='num'>10.8117%</td><td class='num'>6.5257%</td></tr><tr><td>2026-02</td><td class='num'>-4.5820%</td><td class='num'>-6.9929%</td></tr><tr><td>2026-03</td><td class='num'>-11.4280%</td><td class='num'>-27.0845%</td></tr><tr><td>2026-04</td><td class='num'>19.9765%</td><td class='num'>25.1150%</td></tr><tr><td>2026-05</td><td class='num'>6.3349%</td><td class='num'>9.7286%</td></tr>
+    </tbody>
+  </table>
+
+  <h2>交易明细摘要</h2>
+  <p class="muted">仅展示每个画像最佳/最差各 10 笔，完整交易序列可按需追加导出 CSV。</p>
+  <h4>稳健版交易分布</h4><h5>最佳10笔</h5><table><thead><tr><th>信号日</th><th>买入日</th><th>卖出日</th><th>标的</th><th class='num'>收益</th><th class='num'>交易后资金</th><th>市场状态</th></tr></thead><tbody><tr><td>2026-01-08</td><td>2026-01-09</td><td>2026-01-12</td><td>560860</td><td class='num'>8.3233%</td><td class='num'>115,863.10</td><td>risk_on</td></tr><tr><td>2026-04-01</td><td>2026-04-02</td><td>2026-04-03</td><td>159518</td><td class='num'>7.6236%</td><td class='num'>100,731.28</td><td>risk_off</td></tr><tr><td>2026-03-19</td><td>2026-03-20</td><td>2026-03-23</td><td>159981</td><td class='num'>6.6814%</td><td class='num'>103,380.54</td><td>risk_off</td></tr><tr><td>2026-01-07</td><td>2026-01-08</td><td>2026-01-09</td><td>512660</td><td class='num'>6.5542%</td><td class='num'>106,960.43</td><td>risk_on</td></tr><tr><td>2026-03-03</td><td>2026-03-04</td><td>2026-03-05</td><td>561380</td><td class='num'>6.3834%</td><td class='num'>108,855.23</td><td>risk_off</td></tr><tr><td>2026-04-15</td><td>2026-04-16</td><td>2026-04-17</td><td>159967</td><td class='num'>5.7991%</td><td class='num'>110,429.20</td><td>risk_on</td></tr><tr><td>2026-02-05</td><td>2026-02-06</td><td>2026-02-09</td><td>561360</td><td class='num'>5.0920%</td><td class='num'>99,062.20</td><td>risk_off</td></tr><tr><td>2026-01-15</td><td>2026-01-16</td><td>2026-01-19</td><td>588710</td><td class='num'>4.5689%</td><td class='num'>110,800.72</td><td>risk_on</td></tr><tr><td>2026-01-22</td><td>2026-01-23</td><td>2026-01-26</td><td>513310</td><td class='num'>3.7576%</td><td class='num'>114,490.38</td><td>risk_on</td></tr><tr><td>2026-02-27</td><td>2026-03-02</td><td>2026-03-03</td><td>561360</td><td class='num'>3.5430%</td><td class='num'>109,076.85</td><td>risk_on</td></tr></tbody></table><br/><h5>最差10笔</h5><table><thead><tr><th>信号日</th><th>买入日</th><th>卖出日</th><th>标的</th><th class='num'>收益</th><th class='num'>交易后资金</th><th>市场状态</th></tr></thead><tbody><tr><td>2026-01-12</td><td>2026-01-13</td><td>2026-01-14</td><td>159388</td><td class='num'>-6.4398%</td><td class='num'>108,340.63</td><td>risk_on</td></tr><tr><td>2026-03-02</td><td>2026-03-03</td><td>2026-03-04</td><td>561380</td><td class='num'>-6.1913%</td><td class='num'>102,323.55</td><td>risk_on</td></tr><tr><td>2026-03-18</td><td>2026-03-19</td><td>2026-03-20</td><td>159981</td><td class='num'>-5.9541%</td><td class='num'>96,905.83</td><td>risk_off</td></tr><tr><td>2026-03-23</td><td>2026-03-24</td><td>2026-03-25</td><td>159981</td><td class='num'>-5.6747%</td><td class='num'>96,319.83</td><td>risk_off</td></tr><tr><td>2026-02-04</td><td>2026-02-05</td><td>2026-02-06</td><td>561360</td><td class='num'>-4.8644%</td><td class='num'>94,262.32</td><td>risk_off</td></tr><tr><td>2026-01-28</td><td>2026-01-29</td><td>2026-01-30</td><td>159608</td><td class='num'>-4.6822%</td><td class='num'>110,811.67</td><td>risk_on</td></tr><tr><td>2026-02-03</td><td>2026-02-04</td><td>2026-02-05</td><td>159246</td><td class='num'>-4.6109%</td><td class='num'>99,082.04</td><td>risk_off</td></tr><tr><td>2026-02-02</td><td>2026-02-03</td><td>2026-02-04</td><td>159822</td><td class='num'>-3.5165%</td><td class='num'>103,871.49</td><td>risk_off</td></tr><tr><td>2026-03-27</td><td>2026-03-30</td><td>2026-03-31</td><td>562550</td><td class='num'>-3.2743%</td><td class='num'>93,650.88</td><td>risk_off</td></tr><tr><td>2026-04-22</td><td>2026-04-23</td><td>2026-04-24</td><td>159259</td><td class='num'>-3.2528%</td><td class='num'>113,637.72</td><td>risk_on</td></tr></tbody></table>
+  <br/>
+  <h4>激进版交易分布</h4><h5>最佳10笔</h5><table><thead><tr><th>信号日</th><th>买入日</th><th>卖出日</th><th>标的</th><th class='num'>收益</th><th class='num'>交易后资金</th><th>市场状态</th></tr></thead><tbody><tr><td>2026-02-13</td><td>2026-02-24</td><td>2026-02-25</td><td>513310</td><td class='num'>9.4473%</td><td class='num'>98,201.63</td><td>risk_off</td></tr><tr><td>2026-01-08</td><td>2026-01-09</td><td>2026-01-12</td><td>560860</td><td class='num'>8.3233%</td><td class='num'>112,505.72</td><td>risk_on</td></tr><tr><td>2026-04-01</td><td>2026-04-02</td><td>2026-04-03</td><td>159518</td><td class='num'>7.6236%</td><td class='num'>74,934.93</td><td>risk_off</td></tr><tr><td>2026-03-19</td><td>2026-03-20</td><td>2026-03-23</td><td>159981</td><td class='num'>6.6814%</td><td class='num'>79,099.14</td><td>risk_off</td></tr><tr><td>2026-04-15</td><td>2026-04-16</td><td>2026-04-17</td><td>159967</td><td class='num'>5.7991%</td><td class='num'>84,668.83</td><td>risk_on</td></tr><tr><td>2026-04-21</td><td>2026-04-22</td><td>2026-04-23</td><td>159583</td><td class='num'>5.4990%</td><td class='num'>92,225.15</td><td>risk_on</td></tr><tr><td>2026-01-27</td><td>2026-01-28</td><td>2026-01-29</td><td>513310</td><td class='num'>5.1780%</td><td class='num'>111,758.41</td><td>risk_on</td></tr><tr><td>2026-02-05</td><td>2026-02-06</td><td>2026-02-09</td><td>561360</td><td class='num'>5.0920%</td><td class='num'>88,558.29</td><td>risk_off</td></tr><tr><td>2026-05-08</td><td>2026-05-11</td><td>2026-05-12</td><td>515050</td><td class='num'>4.4027%</td><td class='num'>99,188.84</td><td>risk_on</td></tr><tr><td>2026-02-27</td><td>2026-03-02</td><td>2026-03-03</td><td>561360</td><td class='num'>3.5430%</td><td class='num'>102,384.58</td><td>risk_on</td></tr></tbody></table><br/><h5>最差10笔</h5><table><thead><tr><th>信号日</th><th>买入日</th><th>卖出日</th><th>标的</th><th class='num'>收益</th><th class='num'>交易后资金</th><th>市场状态</th></tr></thead><tbody><tr><td>2026-03-06</td><td>2026-03-09</td><td>2026-03-10</td><td>561360</td><td class='num'>-12.5237%</td><td class='num'>82,098.01</td><td>risk_off</td></tr><tr><td>2026-01-29</td><td>2026-01-30</td><td>2026-02-02</td><td>513310</td><td class='num'>-8.1181%</td><td class='num'>97,877.80</td><td>risk_off</td></tr><tr><td>2026-01-12</td><td>2026-01-13</td><td>2026-01-14</td><td>159388</td><td class='num'>-6.4398%</td><td class='num'>103,780.64</td><td>risk_on</td></tr><tr><td>2026-03-02</td><td>2026-03-03</td><td>2026-03-04</td><td>561380</td><td class='num'>-6.1913%</td><td class='num'>96,045.62</td><td>risk_on</td></tr><tr><td>2026-03-23</td><td>2026-03-24</td><td>2026-03-25</td><td>159981</td><td class='num'>-5.6747%</td><td class='num'>74,949.63</td><td>risk_off</td></tr><tr><td>2026-02-04</td><td>2026-02-05</td><td>2026-02-06</td><td>561360</td><td class='num'>-4.8644%</td><td class='num'>84,267.37</td><td>risk_off</td></tr><tr><td>2026-01-28</td><td>2026-01-29</td><td>2026-01-30</td><td>159608</td><td class='num'>-4.6822%</td><td class='num'>106,525.67</td><td>risk_on</td></tr><tr><td>2026-02-03</td><td>2026-02-04</td><td>2026-02-05</td><td>159246</td><td class='num'>-4.6109%</td><td class='num'>88,576.03</td><td>risk_off</td></tr><tr><td>2026-03-27</td><td>2026-03-30</td><td>2026-03-31</td><td>159981</td><td class='num'>-3.9639%</td><td class='num'>72,242.09</td><td>risk_off</td></tr><tr><td>2026-03-30</td><td>2026-03-31</td><td>2026-04-01</td><td>159981</td><td class='num'>-3.5549%</td><td class='num'>69,673.97</td><td>risk_off</td></tr></tbody></table>
+</body>
+</html>

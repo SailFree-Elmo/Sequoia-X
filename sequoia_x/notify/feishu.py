@@ -116,12 +116,13 @@ class FeishuNotifier:
         engine: DataEngine,
         prev_asof: str | None,
         prev_codes: list[str],
+        pick_stats: dict[str, tuple[int, float]],
         current_asof: str | None,
         top_n: int,
         *,
         detailed: bool = False,
     ) -> str:
-        """上一期保存的 Top 在次一交易日的表现，返回简洁摘要。"""
+        """上一期保存的 Top 在「开盘买 O→O」口径下的表现（与回测一致），返回简洁摘要。"""
         header = "**昨日表现**"
         if not current_asof:
             return f"{header}：暂无（无行情数据）"
@@ -130,29 +131,45 @@ class FeishuNotifier:
         d_next = engine.get_next_trading_date_after(prev_asof)
         if not d_next or d_next > current_asof:
             return f"{header}：暂无（上一期 {prev_asof} 的次日未入库）"
-        rows, avg_o, avg_c = compute_pick_followthrough(
-            engine, prev_asof, d_next, prev_codes, max_rows=top_n
+        d_next2 = engine.get_next_trading_date_after(d_next)
+        if not d_next2 or d_next2 > current_asof:
+            return (
+                f"{header}：暂无（上一期 {prev_asof} 需再下一交易日 {d_next2 or '未知'} 的 K 线"
+                f" 才能统计开盘买 O→O，当前数据至 {current_asof}）"
+            )
+        rows, avg_o = compute_pick_followthrough(
+            engine, d_next, d_next2, prev_codes, max_rows=top_n
         )
-        valid_count = sum(1 for r in rows if r.pct_open_buy is not None or r.pct_close_buy is not None)
+        valid_count = sum(1 for r in rows if r.pct_open_buy is not None)
+        stats_suffix = ""
+        if pick_stats:
+            scs = [pick_stats[c] for c in prev_codes[:top_n] if c in pick_stats]
+            if scs:
+                mean_v = sum(s[0] for s in scs) / len(scs)
+                mean_s = sum(s[1] for s in scs) / len(scs)
+                stats_suffix = f" · 上一期 Top 平均 {mean_v:.1f} 票 / 加权均分 {mean_s:.2f}"
+
         if detailed:
             codes = sorted({r.code for r in rows})
             names = self._get_stock_names(codes) if codes else {}
             lines: list[str] = [
-                f"{header}（{prev_asof}→{d_next}，样本 {valid_count}/{len(rows)}）",
+                f"{header}（{prev_asof} 信号 → {d_next} 开盘买 → {d_next2} 开盘卖，样本 {valid_count}/{len(rows)}）",
                 "",
             ]
             for i, r in enumerate(rows, start=1):
                 nm = names.get(r.code, r.code)
                 link = self._link_line(r.code, nm)
-                lines.append(
-                    f"{i}. {link} · 开盘买 {format_pct(r.pct_open_buy)} · 收盘买 {format_pct(r.pct_close_buy)}"
-                )
+                extra = ""
+                if r.code in pick_stats:
+                    vc, vs = pick_stats[r.code]
+                    extra = f" · {vc} 票 / 加权 {vs:.2f}"
+                lines.append(f"{i}. {link} · 开盘买 {format_pct(r.pct_open_buy)}{extra}")
             lines.append("")
-            lines.append(f"开盘买均值 {format_pct(avg_o)} · 收盘买均值 {format_pct(avg_c)}")
+            lines.append(f"开盘买 O→O 等权均值 {format_pct(avg_o)}")
             return "\n".join(lines)
         return (
-            f"{header}（{prev_asof}→{d_next}，样本 {valid_count}/{len(rows)}）"
-            f"\n开盘买均值 {format_pct(avg_o)} · 收盘买均值 {format_pct(avg_c)}"
+            f"{header}（{prev_asof} 信号 → {d_next} 开盘买 → {d_next2} 开盘卖，样本 {valid_count}/{len(rows)}）"
+            f"\n开盘买 O→O 等权均值 {format_pct(avg_o)}{stats_suffix}"
         )
 
     def _build_digest_card(

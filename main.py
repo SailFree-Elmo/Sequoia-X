@@ -3,10 +3,12 @@
 两种运行模式：
   python main.py               # 日常模式：8进程增量补数据 + 跑策略 + 飞书推送
   python main.py --backfill    # 回填模式：baostock 拉全市场 ETF 历史K线（首次/补数据用）
+  python main.py --backfill-range 2023-01-01 2023-12-31  # 仅写入该日历区间（后复权 upsert；baostock 无数据时回退 akshare）
 """
 
 import argparse
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -60,8 +62,7 @@ def build_aggressive_settings(base_settings):
     return base_settings.model_copy(
         deep=True,
         update={
-            "enable_etf_strong_pullback_strategy": True,
-            "enable_etf_uptrend_sharp_drop_strategy": True,
+            # 反转类与稳健默认一致（由 .env 打开）；减轻激进画像全市场扫描
             "stlc_max_5d_return_pct": 0.14,
             "stlc_max_distance_from_ma20": 0.12,
             "stlc_max_upper_shadow_ratio": 0.45,
@@ -80,8 +81,20 @@ def build_aggressive_settings(base_settings):
     )
 
 
-def run_profile_strategies(engine, settings, regime, logger, profile_name: str) -> dict[str, list[str]]:
-    """运行单个参数画像下的策略集合。"""
+def run_profile_strategies(
+    engine,
+    settings,
+    regime,
+    logger,
+    profile_name: str,
+    *,
+    quiet: bool = False,
+) -> dict[str, list[str]]:
+    """运行单个参数画像下的策略集合。
+
+    Args:
+        quiet: 为 True 时降低日志粒度（回测批跑用），避免逐策略 INFO 刷屏。
+    """
     all_strategies: list[BaseStrategy] = [
         MaVolumeStrategy(engine=engine, settings=settings),
         TurtleTradeStrategy(engine=engine, settings=settings),
@@ -108,7 +121,8 @@ def run_profile_strategies(engine, settings, regime, logger, profile_name: str) 
         key = strategy.webhook_key
         strategy_name = type(strategy).__name__
         if not settings.is_strategy_enabled(key):
-            logger.info("[%s] 跳过策略 %s：配置关闭", profile_name, strategy_name)
+            if not quiet:
+                logger.info("[%s] 跳过策略 %s：配置关闭", profile_name, strategy_name)
             continue
         group = groups.get(strategy_name, "trend")
         if (
@@ -116,18 +130,34 @@ def run_profile_strategies(engine, settings, regime, logger, profile_name: str) 
             and (not regime.is_risk_on)
             and (not settings.regime_allow_reversal_when_risk_off)
         ):
-            logger.info("[%s] 跳过策略 %s：risk_off 下关闭反转策略", profile_name, strategy_name)
+            if not quiet:
+                logger.info("[%s] 跳过策略 %s：risk_off 下关闭反转策略", profile_name, strategy_name)
             continue
         strategies.append(strategy)
 
     strategy_hits: dict[str, list[str]] = {}
     for strategy in strategies:
         strategy_name = type(strategy).__name__
-        logger.info("[%s] 执行策略：%s", profile_name, strategy_name)
+        if not quiet:
+            logger.info("[%s] 执行策略：%s", profile_name, strategy_name)
         selected = strategy.run()
         strategy_hits[strategy_name] = selected
-        logger.info("[%s] %s 命中 %d 只 ETF", profile_name, strategy_name, len(selected))
+        if not quiet:
+            logger.info("[%s] %s 命中 %d 只 ETF", profile_name, strategy_name, len(selected))
     return strategy_hits
+
+
+def estimate_recent_bars_for_profiles(settings) -> int:
+    """估算策略批跑需要的最近 K 线窗口，避免加载全历史数据。"""
+    candidates = [
+        120,  # 绝大多数策略窗口上界
+        settings.rps_period + 5,
+        settings.regime_ma_window + 60,
+        settings.etf_dual_ma_confirm_days + 70,
+        settings.tsm_lookback_days + 90,
+        260,  # 兜底：保留约 1 年交易日
+    ]
+    return max(candidates)
 
 
 def main() -> None:
@@ -136,6 +166,12 @@ def main() -> None:
         "--backfill",
         action="store_true",
         help="回填模式：通过 baostock 拉取全市场 ETF 历史 K 线",
+    )
+    parser.add_argument(
+        "--backfill-range",
+        nargs=2,
+        metavar=("START", "END"),
+        help="仅回填 START～END 日历区间内的日 K（后复权 upsert），例如 2023-01-01 2023-12-31",
     )
     parser.add_argument(
         "--push-mode",
@@ -157,6 +193,14 @@ def main() -> None:
 
         engine = DataEngine(settings)
 
+        if args.backfill_range:
+            start_r, end_r = args.backfill_range
+            logger.info("进入区间回填模式：%s ~ %s", start_r, end_r)
+            all_symbols = engine.get_all_symbols()
+            engine.backfill_date_range(all_symbols, start_r, end_r)
+            logger.info("Sequoia-X V2 区间回填运行完成")
+            return
+
         if args.backfill:
             logger.info("进入回填模式...")
             all_symbols = engine.get_all_symbols()
@@ -167,6 +211,9 @@ def main() -> None:
         logger.info("开始拉取最新快照...")
         count = engine.sync_today_bulk()
         logger.info(f"快照同步完成，写入 {count} 条行情")
+        recent_bars = estimate_recent_bars_for_profiles(settings)
+        warmed = engine.preload_ohlcv_cache(recent_bars=recent_bars)
+        logger.info("预热运行期缓存完成：%d symbols, recent_bars=%d", warmed, recent_bars)
 
         regime_filter = MarketRegimeFilter(engine=engine, settings=settings)
         regime = regime_filter.detect()
@@ -177,21 +224,26 @@ def main() -> None:
             regime.breadth_ratio,
         )
 
-        strategy_hits = run_profile_strategies(
-            engine=engine,
-            settings=settings,
-            regime=regime,
-            logger=logger,
-            profile_name="稳健版",
-        )
         aggressive_settings = build_aggressive_settings(settings)
-        strategy_hits_aggressive = run_profile_strategies(
-            engine=engine,
-            settings=aggressive_settings,
-            regime=regime,
-            logger=logger,
-            profile_name="激进版",
-        )
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            conservative_future = executor.submit(
+                run_profile_strategies,
+                engine,
+                settings,
+                regime,
+                logger,
+                "稳健版",
+            )
+            aggressive_future = executor.submit(
+                run_profile_strategies,
+                engine,
+                aggressive_settings,
+                regime,
+                logger,
+                "激进版",
+            )
+            strategy_hits = conservative_future.result()
+            strategy_hits_aggressive = aggressive_future.result()
 
         _log_digest_detail = 20
         for sname, codes in strategy_hits.items():
@@ -221,18 +273,20 @@ def main() -> None:
         current_asof = engine.get_latest_trade_date()
         prev_asof: str | None = None
         prev_codes: list[str] = []
+        prev_stats: dict[str, tuple[int, float]] = {}
         if current_asof:
-            prev_asof, prev_codes = engine.load_digest_top_picks_strictly_before(current_asof)
+            prev_asof, prev_codes, prev_stats = engine.load_digest_top_picks_strictly_before(current_asof)
             # 与「最新行情日」同一天再次跑时，库中可能仅有 asof==current 的一条，strictly_before 为空；
             # 退化为「按保存时间倒序第二新」的一期做对照（若仅有一条则仍为空，由飞书占位说明）。
             if not prev_codes:
-                prev_asof, prev_codes = engine.load_digest_top_picks_second_latest()
+                prev_asof, prev_codes, prev_stats = engine.load_digest_top_picks_second_latest()
 
         notifier = FeishuNotifier(settings)
         yesterday_sec = notifier.build_yesterday_perf_section(
             engine,
             prev_asof,
             prev_codes,
+            prev_stats,
             current_asof,
             settings.feishu_digest_top_n,
             detailed=(push_mode == "close"),
@@ -247,7 +301,13 @@ def main() -> None:
             group_multipliers=settings.get_regime_group_multipliers(regime.regime),
         )
         if current_asof:
-            engine.save_digest_top_picks(current_asof, [p.code for p in picks])
+            pick_rows = [
+                {"code": p.code, "vote_count": p.vote_count, "vote_score": float(p.vote_score)}
+                for p in picks
+            ]
+            engine.save_digest_top_picks(
+                current_asof, [p.code for p in picks], pick_rows=pick_rows
+            )
 
         notifier.send_digest(
             strategy_hits,

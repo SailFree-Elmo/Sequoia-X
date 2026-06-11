@@ -1,6 +1,8 @@
 """日志模块：基于 rich 库提供带颜色的结构化终端日志输出。"""
 
 import logging
+import os
+
 from rich.logging import RichHandler
 
 _FORMAT = "%(name)s - %(message)s"
@@ -33,7 +35,12 @@ def get_logger(name: str) -> logging.Logger:
     handler.setFormatter(logging.Formatter(_FORMAT))
 
     logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
+    level_name = (os.getenv("SEQUOIA_LOG_LEVEL") or "DEBUG").upper()
+    level = getattr(logging, level_name, logging.DEBUG)
+    if not isinstance(level, int):
+        level = logging.DEBUG
+    logger.setLevel(level)
+    handler.setLevel(level)
     logger.propagate = False
 
     return logger

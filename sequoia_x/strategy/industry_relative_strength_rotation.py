@@ -27,7 +27,6 @@ class IndustryRelativeStrengthRotationStrategy(BaseStrategy):
         min_turn20 = self.settings.industry_rotation_min_turnover_20d
         top_groups = max(1, int(self.settings.industry_rotation_top_groups))
         pick_per_group = max(1, int(self.settings.industry_rotation_pick_per_group))
-        max_5d = self.settings.industry_rotation_max_5d_return_pct
 
         symbols = self.engine.get_local_symbols()
         rows: list[dict[str, float | str]] = []
@@ -39,13 +38,9 @@ class IndustryRelativeStrengthRotationStrategy(BaseStrategy):
                 c = df["close"].astype(float)
                 to = df["turnover"].astype(float)
                 c0 = float(c.iloc[-1])
-                c5 = float(c.iloc[-6])
                 c20 = float(c.iloc[-21])
                 c60 = float(c.iloc[-61])
-                if c5 <= 0 or c20 <= 0 or c60 <= 0:
-                    continue
-                r5 = c0 / c5 - 1.0
-                if r5 > max_5d:
+                if c20 <= 0 or c60 <= 0:
                     continue
                 turn20 = float(to.iloc[-20:].mean())
                 if turn20 < min_turn20:
@@ -58,7 +53,6 @@ class IndustryRelativeStrengthRotationStrategy(BaseStrategy):
                         "group": _industry_bucket(symbol),
                         "r20": r20,
                         "r60": r60,
-                        "r5": r5,
                         "turn20": turn20,
                     }
                 )
@@ -79,12 +73,9 @@ class IndustryRelativeStrengthRotationStrategy(BaseStrategy):
         )
         winners = set(group_score.head(top_groups)["group"].astype(str).tolist())
         panel = panel[panel["group"].isin(winners)].copy()
-        panel["symbol_score"] = (
-            panel["r20"] * 0.5
-            + panel["r60"] * 0.3
-            + panel["turn20"].rank(pct=True) * 0.10
-            + (1.0 - panel["r5"].rank(pct=True)) * 0.10
-        )
+        panel["symbol_score"] = panel["r20"] * 0.55 + panel["r60"] * 0.35 + panel["turn20"].rank(
+            pct=True
+        ) * 0.10
 
         out: list[str] = []
         for g in group_score["group"]:

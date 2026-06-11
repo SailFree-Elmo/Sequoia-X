@@ -4,11 +4,8 @@
 from __future__ import annotations
 
 import argparse
-import os
-import socket
 import sqlite3
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -84,18 +81,31 @@ def _normalize_etf_daily(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
 
 def _fetch_etf_history(symbol: str, max_retries: int, sleep_seconds: float) -> pd.DataFrame:
     prefix = _exchange_prefix(symbol)
-    sina_symbol = f"{prefix}{symbol}"
+    symbol_candidates = [symbol, f"{prefix}{symbol}", f"{prefix}.{symbol}"]
     last_error: Exception | None = None
 
-    for attempt in range(max_retries):
-        try:
-            raw = ak.fund_etf_hist_sina(symbol=sina_symbol)
-            normalized = _normalize_etf_daily(raw, symbol=symbol)
-            return normalized
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
-        if attempt < max_retries - 1:
-            time.sleep(sleep_seconds * (attempt + 1))
+    for candidate in symbol_candidates:
+        for attempt in range(max_retries):
+            try:
+                raw = ak.fund_etf_hist_em(
+                    symbol=candidate,
+                    period="daily",
+                    start_date="20230101",
+                    end_date="20241231",
+                    adjust="qfq",
+                )
+                normalized = _normalize_etf_daily(raw, symbol=symbol)
+                if not normalized.empty:
+                    return normalized
+                if raw is not None and not raw.empty:
+                    # 返回非空但映射失败，直接停止该 candidate，尝试下一种 symbol 格式。
+                    break
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                if attempt < max_retries - 1:
+                    time.sleep(sleep_seconds * (attempt + 1))
+                else:
+                    break
 
     if last_error:
         raise last_error
@@ -130,45 +140,32 @@ def _run_backfill(
     symbols: list[str],
     max_retries: int,
     sleep_seconds: float,
-    workers: int,
     second_round_only_failed: bool = False,
 ) -> tuple[RunStats, dict[str, str]]:
     stats = RunStats()
     failed_reasons: dict[str, str] = {}
 
-    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        future_map = {
-            pool.submit(
-                _fetch_etf_history,
-                symbol,
-                max_retries,
-                sleep_seconds,
-            ): symbol
-            for symbol in symbols
-        }
-        for idx, future in enumerate(as_completed(future_map), start=1):
-            symbol = future_map[future]
-            stats.processed += 1
-            try:
-                df = future.result()
-                if df.empty:
-                    stats.skipped_empty += 1
-                else:
-                    written = _upsert_rows(conn, df)
-                    stats.inserted_rows += written
-                    stats.success += 1
-            except Exception as exc:  # noqa: BLE001
-                stats.failed += 1
-                failed_reasons[symbol] = str(exc)
+    for idx, symbol in enumerate(symbols, start=1):
+        stats.processed += 1
+        try:
+            df = _fetch_etf_history(symbol, max_retries=max_retries, sleep_seconds=sleep_seconds)
+            if df.empty:
+                stats.skipped_empty += 1
+            else:
+                written = _upsert_rows(conn, df)
+                stats.inserted_rows += written
+                stats.success += 1
+        except Exception as exc:  # noqa: BLE001
+            stats.failed += 1
+            failed_reasons[symbol] = str(exc)
 
-            if idx % 50 == 0:
-                conn.commit()
-                print(
-                    f"[{'retry' if second_round_only_failed else 'round1'}] "
-                    f"{idx}/{len(symbols)} processed | success={stats.success} "
-                    f"empty={stats.skipped_empty} failed={stats.failed} rows={stats.inserted_rows}",
-                    flush=True,
-                )
+        if idx % 100 == 0:
+            conn.commit()
+            print(
+                f"[{'retry' if second_round_only_failed else 'round1'}] "
+                f"{idx}/{len(symbols)} processed | success={stats.success} "
+                f"empty={stats.skipped_empty} failed={stats.failed} rows={stats.inserted_rows}"
+            )
 
     conn.commit()
     return stats, failed_reasons
@@ -196,9 +193,6 @@ def main() -> None:
     parser.add_argument("--db-path", default="data/etf_sequoia.db", help="SQLite 路径")
     parser.add_argument("--max-retries", type=int, default=3, help="单代码最大重试次数")
     parser.add_argument("--sleep-seconds", type=float, default=0.8, help="失败重试基础等待秒数")
-    parser.add_argument("--socket-timeout", type=float, default=15.0, help="网络请求超时秒数")
-    parser.add_argument("--workers", type=int, default=8, help="并发线程数")
-    parser.add_argument("--limit", type=int, default=0, help="仅处理前 N 个 symbol（0 表示全量）")
     args = parser.parse_args()
 
     db_path = Path(args.db_path)
@@ -206,27 +200,15 @@ def main() -> None:
         raise FileNotFoundError(f"数据库不存在: {db_path}")
 
     started = datetime.now()
-    for key in [
-        "ALL_PROXY",
-        "all_proxy",
-        "HTTP_PROXY",
-        "http_proxy",
-        "HTTPS_PROXY",
-        "https_proxy",
-    ]:
-        os.environ.pop(key, None)
-    socket.setdefaulttimeout(args.socket_timeout)
-    print(f"Backfill started at: {started.isoformat(timespec='seconds')}", flush=True)
-    print(f"Database: {db_path}", flush=True)
-    print(f"Target window: {START_DATE} ~ {END_DATE}", flush=True)
+    print(f"Backfill started at: {started.isoformat(timespec='seconds')}")
+    print(f"Database: {db_path}")
+    print(f"Target window: {START_DATE} ~ {END_DATE}")
 
     with sqlite3.connect(db_path) as conn:
         symbols = _load_symbols(conn)
-        if args.limit > 0:
-            symbols = symbols[: args.limit]
-        print(f"Loaded symbols from local DB: {len(symbols)}", flush=True)
+        print(f"Loaded symbols from local DB: {len(symbols)}")
         if not symbols:
-            print("No symbols found, exit.", flush=True)
+            print("No symbols found, exit.")
             return
 
         round1_stats, failed = _run_backfill(
@@ -234,20 +216,18 @@ def main() -> None:
             symbols=symbols,
             max_retries=args.max_retries,
             sleep_seconds=args.sleep_seconds,
-            workers=args.workers,
             second_round_only_failed=False,
         )
 
         round2_stats = RunStats()
         if failed:
             failed_symbols = sorted(failed.keys())
-            print(f"Round1 failed symbols: {len(failed_symbols)}. Running second round retry...", flush=True)
+            print(f"Round1 failed symbols: {len(failed_symbols)}. Running second round retry...")
             round2_stats, failed_round2 = _run_backfill(
                 conn=conn,
                 symbols=failed_symbols,
                 max_retries=args.max_retries,
                 sleep_seconds=args.sleep_seconds,
-                workers=args.workers,
                 second_round_only_failed=True,
             )
             failed = failed_round2
@@ -255,7 +235,7 @@ def main() -> None:
         ended = datetime.now()
         elapsed = (ended - started).total_seconds()
 
-        print("=== Backfill Summary ===", flush=True)
+        print("=== Backfill Summary ===")
         print(
             "Round1 => "
             f"processed={round1_stats.processed}, success={round1_stats.success}, "
@@ -271,26 +251,25 @@ def main() -> None:
             )
 
         total_rows = round1_stats.inserted_rows + round2_stats.inserted_rows
-        print(f"Total upsert rows: {total_rows}", flush=True)
-        print(f"Failed final symbols: {len(failed)}", flush=True)
+        print(f"Total upsert rows: {total_rows}")
+        print(f"Failed final symbols: {len(failed)}")
         if failed:
             sample = list(sorted(failed.items()))[:20]
-            print("Failed sample (symbol, reason):", flush=True)
+            print("Failed sample (symbol, reason):")
             for sym, reason in sample:
-                print(f"  - {sym}: {reason[:160]}", flush=True)
+                print(f"  - {sym}: {reason[:160]}")
 
-        print(f"Elapsed seconds: {elapsed:.1f}", flush=True)
+        print(f"Elapsed seconds: {elapsed:.1f}")
 
-        print("=== Coverage 2023-2024 ===", flush=True)
+        print("=== Coverage 2023-2024 ===")
         coverage = _coverage_stats(conn)
         if not coverage:
-            print("No rows in target window.", flush=True)
+            print("No rows in target window.")
         else:
             for year, rows, symbols_cnt, min_date, max_date in coverage:
                 print(
                     f"year={year}, rows={rows}, distinct_symbol={symbols_cnt}, "
-                    f"min_date={min_date}, max_date={max_date}",
-                    flush=True,
+                    f"min_date={min_date}, max_date={max_date}"
                 )
 
 

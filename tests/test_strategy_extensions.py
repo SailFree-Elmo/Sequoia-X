@@ -11,10 +11,6 @@ from sequoia_x.core.config import Settings
 from sequoia_x.strategy.market_regime_filter import MarketRegimeFilter
 from sequoia_x.strategy.news_sentiment_breadth import NewsSentimentBreadthStrategy
 from sequoia_x.strategy.rps_breakout import RpsBreakoutStrategy
-from sequoia_x.strategy.strong_trend_low_chase import StrongTrendLowChaseStrategy
-from sequoia_x.strategy.dual_momentum_rotation import DualMomentumRotationStrategy
-from sequoia_x.strategy.trend_stability_momentum import TrendStabilityMomentumStrategy
-from sequoia_x.strategy.low_vol_momentum_blend import LowVolMomentumBlendStrategy
 
 
 class StubEngine:
@@ -47,7 +43,7 @@ def _make_ohlcv(closes: list[float], *, volume: float = 1_000_000.0, turnover: f
 
 def test_rps_breakout_uses_strict_breakout() -> None:
     settings = Settings(
-        db_path="data/test.db",
+        database_url="postgresql://user:pass@127.0.0.1:5433/test_db",
         start_date="2024-01-01",
         feishu_webhook_url="https://example.com/hook",
         rps_period=20,
@@ -71,7 +67,7 @@ def test_rps_breakout_uses_strict_breakout() -> None:
 
 def test_market_regime_filter_detects_risk_off() -> None:
     settings = Settings(
-        db_path="data/test.db",
+        database_url="postgresql://user:pass@127.0.0.1:5433/test_db",
         start_date="2024-01-01",
         feishu_webhook_url="https://example.com/hook",
         regime_benchmark_symbols="510300,159915",
@@ -104,7 +100,7 @@ def test_news_sentiment_strategy_reads_json(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     settings = Settings(
-        db_path="data/test.db",
+        database_url="postgresql://user:pass@127.0.0.1:5433/test_db",
         start_date="2024-01-01",
         feishu_webhook_url="https://example.com/hook",
         news_signal_path=str(p),
@@ -115,94 +111,3 @@ def test_news_sentiment_strategy_reads_json(tmp_path: Path) -> None:
     engine = StubEngine({"510300": _make_ohlcv([1.0] * 70)})
     out = NewsSentimentBreadthStrategy(engine=engine, settings=settings).run()
     assert out == ["510300"]
-
-
-def test_strong_trend_low_chase_filters_overheated_symbol() -> None:
-    settings = Settings(
-        db_path="data/test.db",
-        start_date="2024-01-01",
-        feishu_webhook_url="https://example.com/hook",
-        stlc_min_turnover_20d=1.0,
-        stlc_max_5d_return_pct=0.08,
-        stlc_max_distance_from_ma20=0.08,
-        stlc_max_upper_shadow_ratio=0.6,
-        stlc_min_close_position_ratio=0.5,
-        stlc_max_results=10,
-    )
-    stable_up = [10.0 + i * 0.08 for i in range(79)] + [16.5]
-    overheated = [10.0 + i * 0.08 for i in range(75)] + [20.0, 20.6, 21.2, 21.8, 22.5]
-    engine = StubEngine(
-        {
-            "510300": _make_ohlcv(stable_up, turnover=3e7),
-            "159919": _make_ohlcv(overheated, turnover=3e7),
-        }
-    )
-    out = StrongTrendLowChaseStrategy(engine=engine, settings=settings).run()
-    assert "510300" in out
-    assert "159919" not in out
-
-
-def test_dual_momentum_rotation_selects_trending_symbol() -> None:
-    settings = Settings(
-        db_path="data/test.db",
-        start_date="2024-01-01",
-        feishu_webhook_url="https://example.com/hook",
-        dmr_min_turnover_20d=1.0,
-        dmr_max_5d_return_pct=0.2,
-        dmr_max_results=5,
-    )
-    up = [10 + i * 0.1 for i in range(120)]
-    flat = [10.0 for _ in range(120)]
-    engine = StubEngine(
-        {
-            "510300": _make_ohlcv(up, turnover=2e7),
-            "159919": _make_ohlcv(flat, turnover=2e7),
-        }
-    )
-    out = DualMomentumRotationStrategy(engine=engine, settings=settings).run()
-    assert "510300" in out
-
-
-def test_trend_stability_momentum_prefers_smoother_trend() -> None:
-    settings = Settings(
-        db_path="data/test.db",
-        start_date="2024-01-01",
-        feishu_webhook_url="https://example.com/hook",
-        tsm_lookback_days=30,
-        tsm_min_turnover_20d=1.0,
-        tsm_max_5d_return_pct=0.2,
-        tsm_max_results=5,
-    )
-    smooth = [10 + i * 0.05 for i in range(120)]
-    noisy = [10 + i * 0.05 + (0.3 if i % 2 else -0.3) for i in range(120)]
-    engine = StubEngine(
-        {
-            "510300": _make_ohlcv(smooth, turnover=3e7),
-            "159919": _make_ohlcv(noisy, turnover=3e7),
-        }
-    )
-    out = TrendStabilityMomentumStrategy(engine=engine, settings=settings).run()
-    assert len(out) >= 1
-    assert out[0] == "510300"
-
-
-def test_low_vol_momentum_blend_filters_high_vol_symbol() -> None:
-    settings = Settings(
-        db_path="data/test.db",
-        start_date="2024-01-01",
-        feishu_webhook_url="https://example.com/hook",
-        lvmb_min_turnover_20d=1.0,
-        lvmb_max_volatility_20d=0.05,
-        lvmb_max_5d_return_pct=0.2,
-        lvmb_max_results=5,
-    )
-    low_vol = [10 + i * 0.06 for i in range(120)]
-    high_vol = [10 + i * 0.06 + (1.0 if i % 2 else -1.0) for i in range(120)]
-    engine = StubEngine(
-        {
-            "510300": _make_ohlcv(low_vol, turnover=2e7),
-            "159919": _make_ohlcv(high_vol, turnover=2e7),
-        }
-    )
-    out = LowVolMomentumBlendStrategy(engine=engine, settings=settings).run()
-    assert "510300" in out

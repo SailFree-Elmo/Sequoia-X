@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sequoia-X 月度回测报告 | 2026-05 | 生成于 2026-05-14 12:26:24</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; margin: 24px; color: #111; }
+    h1, h2 { margin: 8px 0 12px; }
+    .meta { margin-bottom: 20px; }
+    .meta span { display: inline-block; margin-right: 18px; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0 24px; font-size: 13px; }
+    th, td { border: 1px solid #d9d9d9; padding: 6px 8px; }
+    th { background: #f5f5f5; text-align: left; position: sticky; top: 0; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0 14px; }
+    .toolbar input, .toolbar select { padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; }
+    .wrap { max-height: 56vh; overflow: auto; border: 1px solid #e6e6e6; margin-bottom: 24px; }
+    .pnl-pos { color: #0a7f37; font-weight: 600; }
+    .pnl-neg { color: #c62828; font-weight: 600; }
+    .pnl-zero { color: #616161; }
+  </style>
+</head>
+<body>
+  <h1>Sequoia-X 月度回测报告 | 2026-05 | 生成于 2026-05-14 12:26:24</h1>
+  <div class="meta">
+    <span><b>回测月份：</b>2026-05</span>
+    <span><b>开始时间：</b>2026-05-14 12:20:14</span>
+    <span><b>结束时间：</b>2026-05-14 12:26:24</span>
+    <span><b>总耗时：</b>370.014s</span>
+    <span><b>缓存预热：</b>4.520s</span>
+    <span><b>回测模拟：</b>301.278s</span>
+    <span><b>信号日数量：</b>4</span>
+    <span><b>手续费（双边）：</b>0.0050% × 2</span>
+  </div>
+
+  <h2>画像汇总</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>画像</th><th class="num">期末资金</th><th class="num">累计收益</th><th class="num">成交次数</th>
+        <th class="num">盈利笔数</th><th class="num">胜率</th><th class="num">单笔平均收益</th><th class="num">最大回撤</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>稳健版</td><td class='num'>104,653.94</td><td class='num'>+4.6539%</td><td class='num'>4</td><td class='num'>3</td><td class='num'>+75.0000%</td><td class='num'>+1.1578%</td><td class='num'>-1.4085%</td></tr><tr><td>激进版</td><td class='num'>107,149.39</td><td class='num'>+7.1494%</td><td class='num'>4</td><td class='num'>3</td><td class='num'>+75.0000%</td><td class='num'>+1.7545%</td><td class='num'>-0.0100%</td></tr>
+    </tbody>
+  </table>
+
+  <h2>交易明细筛选</h2>
+  <div class="toolbar">
+    <input id="kw" type="text" placeholder="搜索标的代码/名称/策略/备注..." />
+    <select id="status">
+      <option value="">全部状态</option>
+      <option value="EXECUTED">仅成交</option>
+      <option value="SKIPPED_NO_SIGNAL">仅无信号</option>
+      <option value="SKIPPED_MISSING_OPEN">仅缺开盘价</option>
+    </select>
+    <select id="pnlSign">
+      <option value="">盈亏不限</option>
+      <option value="pos">仅盈利</option>
+      <option value="neg">仅亏损</option>
+    </select>
+  </div>
+
+  <h2>稳健版交易明细</h2>
+  <div class="wrap">
+    <table data-profile-table="稳健版">
+      <thead>
+        <tr>
+          <th>#</th><th>信号日</th><th>买入时间</th><th>卖出时间</th><th>标的</th><th>名称</th><th>命中策略</th>
+          <th class="num">买入开盘价</th><th class="num">卖出开盘价</th><th class="num">交易金额(期初资金)</th>
+          <th class="num">买入手续费</th><th class="num">卖出手续费</th><th class="num">期末资金</th>
+          <th class="num">本笔盈亏</th><th class="num">本笔收益率</th><th>状态</th><th>备注</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr data-profile='稳健版' data-status='EXECUTED' data-symbol='562950' data-name='易方达中证消费电子主题ETF' data-reason='Top1 O-&gt;O 隔夜交易' data-strategies='AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, EtfTrendFollowStrategy, IndustryRelativeStrengthRotationStrategy, LowVolMomentumBlendStrategy, RpsBreakoutStrategy, TurtleTradeStrategy'><td>1</td><td>2026-05-06</td><td>2026-05-07 09:30</td><td>2026-05-08 09:30</td><td>562950</td><td>易方达中证消费电子主题ETF</td><td>AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, EtfTrendFollowStrategy, IndustryRelativeStrengthRotationStrategy, LowVolMomentumBlendStrategy, RpsBreakoutStrategy, TurtleTradeStrategy</td><td class='num'>1.5420</td><td class='num'>1.5570</td><td class='num'>100,000.00</td><td class='num'>5.00</td><td class='num'>5.05</td><td class='num'>100,962.71</td><td class='num pnl-pos'>962.71</td><td class='num pnl-pos'>+0.9627%</td><td>EXECUTED</td><td>Top1 O-&gt;O 隔夜交易</td></tr><tr data-profile='稳健版' data-status='EXECUTED' data-symbol='562950' data-name='易方达中证消费电子主题ETF' data-reason='Top1 O-&gt;O 隔夜交易' data-strategies='AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, IndustryRelativeStrengthRotationStrategy, LowVolMomentumBlendStrategy, RpsBreakoutStrategy, TurtleTradeStrategy'><td>2</td><td>2026-05-07</td><td>2026-05-08 09:30</td><td>2026-05-11 09:30</td><td>562950</td><td>易方达中证消费电子主题ETF</td><td>AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, IndustryRelativeStrengthRotationStrategy, LowVolMomentumBlendStrategy, RpsBreakoutStrategy, TurtleTradeStrategy</td><td class='num'>1.5570</td><td class='num'>1.5860</td><td class='num'>100,962.71</td><td class='num'>5.05</td><td class='num'>5.14</td><td class='num'>102,833.01</td><td class='num pnl-pos'>1,870.30</td><td class='num pnl-pos'>+1.8525%</td><td>EXECUTED</td><td>Top1 O-&gt;O 隔夜交易</td></tr><tr data-profile='稳健版' data-status='EXECUTED' data-symbol='159732' data-name='华夏国证消费电子主题ETF' data-reason='Top1 O-&gt;O 隔夜交易' data-strategies='AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, LowVolMomentumBlendStrategy, TrendStabilityMomentumStrategy, TurtleTradeStrategy'><td>3</td><td>2026-05-08</td><td>2026-05-11 09:30</td><td>2026-05-12 09:30</td><td>159732</td><td>华夏国证消费电子主题ETF</td><td>AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, LowVolMomentumBlendStrategy, TrendStabilityMomentumStrategy, TurtleTradeStrategy</td><td class='num'>1.4220</td><td class='num'>1.4680</td><td class='num'>102,833.01</td><td class='num'>5.14</td><td class='num'>5.31</td><td class='num'>106,149.09</td><td class='num pnl-pos'>3,316.08</td><td class='num pnl-pos'>+3.2247%</td><td>EXECUTED</td><td>Top1 O-&gt;O 隔夜交易</td></tr><tr data-profile='稳健版' data-status='EXECUTED' data-symbol='159259' data-name='易方达国证成长100ETF' data-reason='Top1 O-&gt;O 隔夜交易' data-strategies='AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, LowVolMomentumBlendStrategy, RpsBreakoutStrategy, TrendStabilityMomentumStrategy, TurtleTradeStrategy'><td>4</td><td>2026-05-11</td><td>2026-05-12 09:30</td><td>2026-05-13 09:30</td><td>159259</td><td>易方达国证成长100ETF</td><td>AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, LowVolMomentumBlendStrategy, RpsBreakoutStrategy, TrendStabilityMomentumStrategy, TurtleTradeStrategy</td><td class='num'>1.4300</td><td class='num'>1.4100</td><td class='num'>106,149.09</td><td class='num'>5.31</td><td class='num'>5.23</td><td class='num'>104,653.94</td><td class='num pnl-neg'>-1,495.14</td><td class='num pnl-neg'>-1.4085%</td><td>EXECUTED</td><td>Top1 O-&gt;O 隔夜交易</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>激进版交易明细</h2>
+  <div class="wrap">
+    <table data-profile-table="激进版">
+      <thead>
+        <tr>
+          <th>#</th><th>信号日</th><th>买入时间</th><th>卖出时间</th><th>标的</th><th>名称</th><th>命中策略</th>
+          <th class="num">买入开盘价</th><th class="num">卖出开盘价</th><th class="num">交易金额(期初资金)</th>
+          <th class="num">买入手续费</th><th class="num">卖出手续费</th><th class="num">期末资金</th>
+          <th class="num">本笔盈亏</th><th class="num">本笔收益率</th><th>状态</th><th>备注</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr data-profile='激进版' data-status='EXECUTED' data-symbol='562950' data-name='易方达中证消费电子主题ETF' data-reason='Top1 O-&gt;O 隔夜交易' data-strategies='AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, EtfTrendFollowStrategy, IndustryRelativeStrengthRotationStrategy, LowVolMomentumBlendStrategy, RpsBreakoutStrategy, TurtleTradeStrategy'><td>1</td><td>2026-05-06</td><td>2026-05-07 09:30</td><td>2026-05-08 09:30</td><td>562950</td><td>易方达中证消费电子主题ETF</td><td>AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, EtfTrendFollowStrategy, IndustryRelativeStrengthRotationStrategy, LowVolMomentumBlendStrategy, RpsBreakoutStrategy, TurtleTradeStrategy</td><td class='num'>1.5420</td><td class='num'>1.5570</td><td class='num'>100,000.00</td><td class='num'>5.00</td><td class='num'>5.05</td><td class='num'>100,962.71</td><td class='num pnl-pos'>962.71</td><td class='num pnl-pos'>+0.9627%</td><td>EXECUTED</td><td>Top1 O-&gt;O 隔夜交易</td></tr><tr data-profile='激进版' data-status='EXECUTED' data-symbol='159259' data-name='易方达国证成长100ETF' data-reason='Top1 O-&gt;O 隔夜交易' data-strategies='AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, LowVolMomentumBlendStrategy, RpsBreakoutStrategy, StrongTrendLowChaseStrategy, TrendStabilityMomentumStrategy, TurtleTradeStrategy'><td>2</td><td>2026-05-07</td><td>2026-05-08 09:30</td><td>2026-05-11 09:30</td><td>159259</td><td>易方达国证成长100ETF</td><td>AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, LowVolMomentumBlendStrategy, RpsBreakoutStrategy, StrongTrendLowChaseStrategy, TrendStabilityMomentumStrategy, TurtleTradeStrategy</td><td class='num'>1.3750</td><td class='num'>1.3980</td><td class='num'>100,962.71</td><td class='num'>5.05</td><td class='num'>5.13</td><td class='num'>102,641.36</td><td class='num pnl-pos'>1,678.65</td><td class='num pnl-pos'>+1.6626%</td><td>EXECUTED</td><td>Top1 O-&gt;O 隔夜交易</td></tr><tr data-profile='激进版' data-status='EXECUTED' data-symbol='515050' data-name='华夏中证5G通信主题ETF' data-reason='Top1 O-&gt;O 隔夜交易' data-strategies='AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, IndustryRelativeStrengthRotationStrategy, LowVolMomentumBlendStrategy, StrongTrendLowChaseStrategy, TrendStabilityMomentumStrategy'><td>3</td><td>2026-05-08</td><td>2026-05-11 09:30</td><td>2026-05-12 09:30</td><td>515050</td><td>华夏中证5G通信主题ETF</td><td>AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, IndustryRelativeStrengthRotationStrategy, LowVolMomentumBlendStrategy, StrongTrendLowChaseStrategy, TrendStabilityMomentumStrategy</td><td class='num'>3.2180</td><td class='num'>3.3600</td><td class='num'>102,641.36</td><td class='num'>5.13</td><td class='num'>5.36</td><td class='num'>107,160.11</td><td class='num pnl-pos'>4,518.74</td><td class='num pnl-pos'>+4.4025%</td><td>EXECUTED</td><td>Top1 O-&gt;O 隔夜交易</td></tr><tr data-profile='激进版' data-status='EXECUTED' data-symbol='159967' data-name='华夏创成长ETF' data-reason='Top1 O-&gt;O 隔夜交易' data-strategies='AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, IndustryRelativeStrengthRotationStrategy, LowVolMomentumBlendStrategy, StrongTrendLowChaseStrategy, TrendStabilityMomentumStrategy, TurtleTradeStrategy'><td>4</td><td>2026-05-11</td><td>2026-05-12 09:30</td><td>2026-05-13 09:30</td><td>159967</td><td>华夏创成长ETF</td><td>AdxMaRegimeTrendStrategy, DualMomentumRotationStrategy, EtfMultiFactorStrategy, IndustryRelativeStrengthRotationStrategy, LowVolMomentumBlendStrategy, StrongTrendLowChaseStrategy, TrendStabilityMomentumStrategy, TurtleTradeStrategy</td><td class='num'>0.8600</td><td class='num'>0.8600</td><td class='num'>107,160.11</td><td class='num'>5.36</td><td class='num'>5.36</td><td class='num'>107,149.39</td><td class='num pnl-neg'>-10.72</td><td class='num pnl-neg'>-0.0100%</td><td>EXECUTED</td><td>Top1 O-&gt;O 隔夜交易</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const kwEl = document.getElementById("kw");
+    const statusEl = document.getElementById("status");
+    const pnlSignEl = document.getElementById("pnlSign");
+
+    function matchPnlSign(row, sign) {
+      if (!sign) return true;
+      const pnlCell = row.children[13];
+      const text = (pnlCell?.textContent || "").trim();
+      if (!text) return true;
+      if (sign === "pos") return text.startsWith("+");
+      if (sign === "neg") return text.startsWith("-");
+      return true;
+    }
+
+    function applyFilter() {
+      const kw = (kwEl.value || "").trim().toLowerCase();
+      const status = statusEl.value;
+      const pnlSign = pnlSignEl.value;
+      const rows = document.querySelectorAll("tbody tr[data-profile]");
+      rows.forEach((row) => {
+        const hay = [
+          row.dataset.symbol || "",
+          row.dataset.name || "",
+          row.dataset.reason || "",
+          row.dataset.strategies || "",
+          row.dataset.status || "",
+        ].join(" ").toLowerCase();
+        const kwOk = !kw || hay.includes(kw);
+        const statusOk = !status || row.dataset.status === status;
+        const pnlOk = matchPnlSign(row, pnlSign);
+        row.style.display = kwOk && statusOk && pnlOk ? "" : "none";
+      });
+    }
+
+    [kwEl, statusEl, pnlSignEl].forEach((el) => el.addEventListener("input", applyFilter));
+    [statusEl, pnlSignEl].forEach((el) => el.addEventListener("change", applyFilter));
+  </script>
+</body>
+</html>
